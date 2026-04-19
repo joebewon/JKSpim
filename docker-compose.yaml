@@ -1,7 +1,7 @@
 services:
   webtop:
     image: cs233illinois/webtop-spimbot
-    container_name: webtop-spimbot
+    container_name: webtop-spimbot-jkspim
     environment:
       - PUID=1000
       - PGID=1000
