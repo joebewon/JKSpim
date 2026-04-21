@@ -11,8 +11,11 @@ where:
 
 From here we can define the objective function $R: B \mapsto \mathbb{R}$:
 ```math
-R(b) \coloneqq \frac{w(b)}{t_{reach}(b) + t_{jump}(b)}
+R(b) \coloneqq \frac{w(b)}{t_{reach}(b) + t_{playpen}(b)}
 ```
+
+where:
+- $t_{playpen} : B \mapsto \mathbb{Z}$ s.t. $t_{playpen}$ takes the number of cycles for the bot to reach the playpen from a bunny.
 
 Therefore, our greedy choice is to maximize that ratio over bunnies in the feasible set $B'$, that is:
 ```math
