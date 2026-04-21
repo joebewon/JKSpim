@@ -30,7 +30,7 @@ PickBestBunny(B):
       continue
     
     // Compute R(b)
-    let travel_time = (b.cycles_until_reach + b.cycles_until_jump)
+    let travel_time = (b.cycles_until_reach + playpen.cylcles_until_reach)
     let ratio = b.weight / travel_time
 
     // Compute argmax R(b)
