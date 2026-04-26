@@ -117,88 +117,101 @@ SolvePuzzle:
     add     $sp, $sp, 8
     jr      $ra
 
+# @function
+#
+# Solves a puzzle
+#
+# @UsedTemporaries: $t0, $t1, $t2, $t4, $t5, $t6, $t7, $a0, $a1, $a2, $a3
+#
+# @Params:
+# - $a0 (LightsOuts* puzzle): A pointer to the requested puzzle struct
+# - $a1 (unsigned char* solution): A pointer to the solution matrix
+# - $a2 (unsigned char* board_buff): A pointer to a borad buffer matrix
+#
+# @Returns:
+# - $v0 (bool): Whether or not the puzzle is solvable. If it is, the solution will be at `@solution`.
 FRESolve2:
     ################ ################ Allocate Stack ################ ################
-    sub		$sp, $sp, 44                                # Allocate 44 bytes on the stack
-    sw      $ra, 0($sp)                                 # Save $ra to the stack
-    sw      $a0, 4($sp)                                 # Save puzzle to the stack
-    sw      $a1, 8($sp)                                 # Save solution to the stack
-    sw      $a2, 12($sp)                                # Save board_buff to the stack
+    sub		$sp, $sp, 44                                    # Allocate 44 bytes on the stack
+    sw      $ra, 0($sp)                                     # Save $ra to the stack
+    sw      $a0, 4($sp)                                     # Save puzzle to the stack
+    sw      $a1, 8($sp)                                     # Save solution to the stack
+    sw      $a2, 12($sp)                                    # Save board_buff to the stack
 
     ################ ################ Preamble ################ ################
-    lw      $t0, $a0(0)                                 # const int num_rows = puzzle->num_rows;
-    lw      $t1, $a0(4)                                 # const int num_cols = puzzle->num_cols;
-    addi    $t2, $a0, 12                                # unsigned char* board_ptr = &puzzle->board;
+    lw      $t0, $a0(0)                                     # const int num_rows = puzzle->num_rows;
+    lw      $t1, $a0(4)                                     # const int num_cols = puzzle->num_cols;
+    addi    $t2, $a0, 12                                    # unsigned char* board_ptr = &puzzle->board;
 
-    bgt		$t1, $t0, FS2_Transpose                     # if num_cols > num_rows then goto FS2_Transpose
+    bgt		$t1, $t0, FS2_Transpose                         # if num_cols > num_rows then goto FS2_Transpose
     
     ################ ################ Normal Solve ################ ################
     FS2_Normal:
         addi    $t3, $0, 1
-        sllv    $t3, $t3, $t1                           # const uint32_t permutations = 2**num_cols;
+        sllv    $t3, $t3, $t1                               # const uint32_t permutations = 2**num_cols;
 
-        sw      $t0, 16($sp)                            # Save num_rows to the stack
-        sw      $t1, 20($sp)                            # Save num_cols to the stack
-        sw      $t2, 24($sp)                            # Save board_ptr to the stack
-        sw      $t3, 28($sp)                            # Save permutations to the stack
+        sw      $t0, 16($sp)                                # Save num_rows to the stack
+        sw      $t1, 20($sp)                                # Save num_cols to the stack
+        sw      $t2, 24($sp)                                # Save board_ptr to the stack
+        sw      $t3, 28($sp)                                # Save permutations to the stack
 
-        addi    $t4, $0, $0                             # uint16_t mask = 0;
-        move    $a0, $t2                                # $a0 = board_ptr | Premptively move for the copy call
-        move    $a1, $a2                                # $a1 = board_buff | Premptively move for the copy call
-        move    $a2, $t0                                # $a2 = num_rows | Premptively move for the copy call
-        move    $a3, $t1                                # $a3 = num_cols | Premptively move for the copy call
+        addi    $t4, $0, $0                                 # uint16_t mask = 0;
+        move    $a0, $t2                                    # $a0 = board_ptr | Premptively move for the copy call
+        move    $a1, $a2                                    # $a1 = board_buff | Premptively move for the copy call
+        move    $a2, $t0                                    # $a2 = num_rows | Premptively move for the copy call
+        move    $a3, $t1                                    # $a3 = num_cols | Premptively move for the copy call
         FS2_N_Main_For:
-            bge		$t4, $t3, FS2_N_Main_Rof            # if mask >= permutations then goto FS2_N_Main_Rof
+            bge		$t4, $t3, FS2_N_Main_Rof                # if mask >= permutations then goto FS2_N_Main_Rof
 
-            sw      $t4, 32($sp)                        # Save mask to the stack
+            sw      $t4, 32($sp)                            # Save mask to the stack
 
-            jal     Copy                                # copy(board_ptr, board_buff, num_rows, num_cols);
+            jal     Copy                                    # copy(board_ptr, board_buff, num_rows, num_cols);
 
-            lw      $a0, 4($sp)                         # $a0 = &solution (directly from the stack)
-            lw      $a1, 16($sp)                        # $a0 = num_rows (directly from the stack)
-            lw      $a3, 20($sp)                        # $a0 = num_cols (directly from the stack)
-            jal     zero_board                          # zero_board(solution, num_rows, num_cols);
+            lw      $a0, 4($sp)                             # $a0 = &solution (directly from the stack)
+            lw      $a1, 16($sp)                            # $a0 = num_rows (directly from the stack)
+            lw      $a3, 20($sp)                            # $a0 = num_cols (directly from the stack)
+            jal     zero_board                              # zero_board(solution, num_rows, num_cols);
 
-            lw      $t1, 20($sp)                        # Load num_cols from the stack
-            lw      $t4, 32($sp)                        # Load mask from the stack
-            # lw      $a2, 12($sp)                        # Load board_buff from the stack
-            # lw      $a1, 8($sp)                         # Load solution from the stack
-            addi    $t5, $0, $0                         # int j = 0;
+            lw      $t1, 20($sp)                            # Load num_cols from the stack
+            lw      $t4, 32($sp)                            # Load mask from the stack
+            # lw      $a2, 12($sp)                            # Load board_buff from the stack
+            # lw      $a1, 8($sp)                             # Load solution from the stack
+            addi    $t5, $0, $0                             # int j = 0;
             FS2_N_Enum_For:
-                sllv    $t6, $t4, $t5                   # $t6 = mask >> j
-                andi    $t6, $t6, 1                     # $t6 = (mask >> j) & 1
-                bne		$t6, 1, FS2_N_Enum_For_Inc      # Continue iff !((mask >> j) & 1 == 1)
+                sllv    $t6, $t4, $t5                       # $t6 = mask >> j
+                andi    $t6, $t6, 1                         # $t6 = (mask >> j) & 1
+                bne		$t6, 1, FS2_N_Enum_For_Inc          # Continue iff !((mask >> j) & 1 == 1)
                 
-                sw      $t5, 36($sp)                    # Save j to the stack
+                sw      $t5, 36($sp)                        # Save j to the stack
 
-                lw      $a0, 12($sp)                    # Load board buff directly into $a0
-                move    $a1, $0                         # $a1 = 0
-                move    $a2, $t5                        # $a2 = j
-                move    $a3, $0                         # $a3 = 0
+                lw      $a0, 12($sp)                        # Load board buff directly into $a0
+                move    $a1, $0                             # $a1 = 0
+                move    $a2, $t5                            # $a2 = j
+                move    $a3, $0                             # $a3 = 0
                 jal     toggle_light
 
-                lw      $a1, 8($sp)                     # Load solution from the stack
-                add     $a1, $a1, $t5                   # $a1 = &solution[0][j]; equiv. $a1 = &solution + j;
-                ori     $t6, $0, 1                      # $t6 = 1
-                sw      $t6, 0($a1)                     # solution[0][j] = 1; equiv. solution[0*num_cols + j] = 1; solution[j] = 1;
+                lw      $a1, 8($sp)                         # Load solution from the stack
+                add     $a1, $a1, $t5                       # $a1 = &solution[0][j]; equiv. $a1 = &solution + j;
+                ori     $t6, $0, 1                          # $t6 = 1
+                sw      $t6, 0($a1)                         # solution[0][j] = 1; equiv. solution[0*num_cols + j] = 1; solution[j] = 1;
 
-                lw      $t4, 32($sp)                    # Load mask from the stack
-                lw      $t1, 20($sp)                    # Load num_cols from the stack
-                lw      $t5, 36($sp)                    # Load j from the stack
+                lw      $t4, 32($sp)                        # Load mask from the stack
+                lw      $t1, 20($sp)                        # Load num_cols from the stack
+                lw      $t5, 36($sp)                        # Load j from the stack
                 FS2_N_Enum_For_Inc:
-                    addi    $t5, $t5, 1                 # ++j;
-                    blt		$t5, $t1, FS2_N_Enum_For    # if j < num_cols then goto FS2_N_Enum_For
+                    addi    $t5, $t5, 1                     # ++j;
+                    blt		$t5, $t1, FS2_N_Enum_For        # if j < num_cols then goto FS2_N_Enum_For
                 
             FS2_N_Enum_Rof:
-                lw      $t0, 16($sp)                    # Load num_rows from the stack
-                lw      $t1, 20($sp)                    # Load num_cols from the stack
-                li      $t5, 1                          # int i = 1;
+                lw      $t0, 16($sp)                        # Load num_rows from the stack
+                lw      $t1, 20($sp)                        # Load num_cols from the stack
+                li      $t5, 1                              # int i = 1;
             FS2_N_Iter_For_O:
-                bge		$t5, $t0, FS2_N_Iter_Rof_O      # if i >= num_rows then goto FS2_N_Iter_Rof_O
+                bge		$t5, $t0, FS2_N_Iter_Rof_O          # if i >= num_rows then goto FS2_N_Iter_Rof_O
 
-                sw      $t5, 36($sp)                    # save i
+                sw      $t5, 36($sp)                        # save i
 
-                li      $t6, 0                          # int j = 0;
+                li      $t6, 0                              # int j = 0;
                 FS2_N_Iter_For_I:
                     bge		$t6, $t1, FS2_N_Iter_Rof_I      # if j >= num_cols then goto FS2_N_Iter_Rof_I
 
@@ -239,29 +252,29 @@ FRESolve2:
                     j		FS2_N_Iter_For_O                # jump to FS2_N_Iter_For_O
 
             FS2_N_Iter_Rof_O:
-                lw      $a0, 12($sp)                    # $a0 = board_buff
-                lw      $a1, 16($sp)                    # $a1 = num_rows
-                lw      $a2, 20($sp)                    # $a2 = num_cols
-                jal     board_done                      # $v0 = board_done(board_buff, num_cols, num_rows)
+                lw      $a0, 12($sp)                        # $a0 = board_buff
+                lw      $a1, 16($sp)                        # $a1 = num_rows
+                lw      $a2, 20($sp)                        # $a2 = num_cols
+                jal     board_done                          # $v0 = board_done(board_buff, num_cols, num_rows)
 
                 # Reload all of the things we need for the next iteration
-                lw      $t3, 28($sp)                    # Load permutations from the stack
-                lw      $t4, 32($sp)                    # Load mask from the stack
-                lw      $a0, 24($sp)                    # $a0 = board_ptr | Premptively moved for the copy call
-                lw      $a1, 12($sp)                    # $a1 = board_buff | Premptively moved for the copy call
-                lw      $a2, 16($sp)                    # $a2 = num_rows | Premptively moved for the copy call
-                lw      $a3, 20($sp)                    # $a3 = num_cols | Premptively moved for the copy call
+                lw      $t3, 28($sp)                        # Load permutations from the stack
+                lw      $t4, 32($sp)                        # Load mask from the stack
+                lw      $a0, 24($sp)                        # $a0 = board_ptr | Premptively moved for the copy call
+                lw      $a1, 12($sp)                        # $a1 = board_buff | Premptively moved for the copy call
+                lw      $a2, 16($sp)                        # $a2 = num_rows | Premptively moved for the copy call
+                lw      $a3, 20($sp)                        # $a3 = num_cols | Premptively moved for the copy call
 
-                bne		$v0, 1, FS2_N_Main_For          # Try next permutation iff !board_done(board_buff, num_cols, num_rows)
-                lw      $ra, 0($sp)                     # Otherwise, load $ra from the stack
-                add     $sp, $sp, 44                    # Deallocate 44 bytes from the stack
+                bne		$v0, 1, FS2_N_Main_For              # Try next permutation iff !board_done(board_buff, num_cols, num_rows)
+                lw      $ra, 0($sp)                         # Otherwise, load $ra from the stack
+                add     $sp, $sp, 44                        # Deallocate 44 bytes from the stack
                 jr      $ra
 
         FS2N_Main_Rof:
             lw      $ra, 0($sp)
-            add     $sp, $sp, 44                        # Deallocate 44 bytes from the stack
+            add     $sp, $sp, 44                            # Deallocate 44 bytes from the stack
             move    $v0, $0
-            jr      $ra                                 # return false;
+            jr      $ra                                     # return false;
     
     ################ ################ Transposed Solve ################ ################
     FS2_Transpose:
