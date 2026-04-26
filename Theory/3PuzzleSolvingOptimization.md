@@ -30,12 +30,12 @@ We can aggresivly optimize `board_done` from $O(nm)$ to $O(m)$ by one, only chec
 
 ```c++
 // -------------- optimized board_done
-bool board_done(unsigned char* board, int num_rows, int num_columns) {
+bool board_done(unsigned char* board) {
     // Using an array to make pseudo code syntax short for doc purposes
     // Would actually load all four words directly into registers
     std::array<uint32_t, 4> words;
     // I don't care if there not word aligned, I want them now!!!
-    const unsigned char* last_row = board[num_rows - 1][0];
+    const unsigned char* last_row = &board[15][0];
     std::memcpy(&words[0], last_row + 0, 4);
     std::memcpy(&words[1], last_row + 4, 4);
     std::memcpy(&words[2], last_row + 8, 4);
@@ -48,7 +48,7 @@ bool board_done(unsigned char* board, int num_rows, int num_columns) {
 After some research, I found the `lwl` and `lwr` instructions in the MIPS ISA. In our case, the four `memcpy`s would become the following,
 
 ```mips
-# $t9 = &board[num_rows - 1][0]
+# $t9 = &board[15][0]
 
 lwl $t0, 0($t9)
 lwr $t0, 3($t9)
@@ -77,23 +77,22 @@ Since we need to copy the board on every try anyway, we can transpose the matrix
 // This is not meant to be directly compiled
 
 // ------------- num_lights == 2 case
-bool fre_solve_2(LightsOuts* puzzle, unsigned char* solution) {
+bool fre_solve_2(LightsOuts* puzzle, unsigned char* solution, unsigned char* board_buff) {
     const int num_rows = puzzle->num_rows;
     const int num_cols = puzzle->num_cols;
-    unsigned int* board_ptr = &puzzle->board;
+    unsigned char* board_ptr = &puzzle->board;
 
-    unsigned char mask[16] = {0};
     if (num_cols <= num_rows) {
         const uint32_t permutations = 2**num_cols;
         for (uint16_t mask = 0; mask < permutations; ++mask) {
-            unsigned char* board_cpy = copy(board_ptr);
-            zero_board(solution num_rows, num_cols);
+            copy(board_ptr, board_buff, num_rows, num_cols);
+            zero_board(solution, num_rows, num_cols);
     
             // i is directly the bit mask of how to toggle the top row
             // s.t. we toggle top_row[j] iff b_j == 1
             for (uint8_t j = 0; j < num_cols; ++j) {
                 if ((mask >> j) & 1 == 1) {
-                    toggle_light(board_cpy, 0, j, 1);
+                    toggle_light(board_buff, 0, j, 1);
                     solution[0][j] = 1;
                 }
             }
@@ -104,14 +103,14 @@ bool fre_solve_2(LightsOuts* puzzle, unsigned char* solution) {
             // because we need to turn it off
             for (uint8_t i = 1; i < num_rows; ++i) {
                 for (uint8_t j = 0; j < num_cols; ++j) {
-                    if (board_cpy[i - 1][j] == 1) {
-                        toggle_light(board_cpy, i, j, 1);
+                    if (board_buff[i - 1][j] == 1) {
+                        toggle_light(board_buff, i, j, 1);
                         solution[i][j] = 1;
                     }
                 }
             }
     
-            if (board_done(board, num_rows, num_cols)) return true;
+            if (board_done(board_buff)) return true;
         }
         
         return false;
@@ -123,16 +122,16 @@ bool fre_solve_2(LightsOuts* puzzle, unsigned char* solution) {
             // and that we have to reverse the indexing into solution.
 
             // Transpose the board on copy.
-            unsigned char* board_cpy = copy_T(board_ptr);
+            copy_T(board_ptr, board_buff, num_rows, num_cols);
 
             // Don't transpose when zeroing the board
-            zero_board(solution num_rows, num_cols);
+            zero_board(solution, num_rows, num_cols);
     
             // i is directly the bit mask of how to toggle the top row
             // s.t. we toggle top_column[j] iff b_j == 1
             for (uint8_t j = 0; j < num_rows; ++j) {
                 if ((mask >> j) & 1 == 1) {
-                    toggle_light(board_cpy, 0, j, 1);
+                    toggle_light(board_buff, 0, j, 1);
                     solution[j][0] = 1; // Remember to reverse the indexing
                 }
             }
@@ -143,14 +142,14 @@ bool fre_solve_2(LightsOuts* puzzle, unsigned char* solution) {
             // because we need to turn it off
             for (uint8_t i = 1; i < num_cols; ++i) {
                 for (uint8_t j = 0; j < num_rows; ++j) {
-                    if (board_cpy[i - 1][j] == 1) {
-                        toggle_light(board_cpy, i, j, 1);
+                    if (board_buff[i - 1][j] == 1) {
+                        toggle_light(board_buff, i, j, 1);
                         solution[j][i] = 1; // Remember to reverse the indexing
                     }
                 }
             }
     
-            if (board_done(board_cpy, num_cols, num_rows)) return true;
+            if (board_done(board_buff)) return true;
         }
         
         return false;
@@ -164,7 +163,7 @@ bool fre_solve_2(LightsOuts* puzzle, unsigned char* solution) {
 bool fre_solve_3(LightsOuts* puzzle, unsigned char* solution) {
     const int num_rows = puzzle->num_rows;
     const int num_cols = puzzle->num_cols;
-    unsigned int* board_ptr = &puzzle->board;
+    unsigned char* board_ptr = &puzzle->board;
 
     // Toggle mask with a base 3 increment. Least significant trit is mask[0], while mask[num_cols|num_rows] handles overflow
     unsigned char mask[17] = {0};
@@ -172,7 +171,7 @@ bool fre_solve_3(LightsOuts* puzzle, unsigned char* solution) {
         // const uint32_t permutations = 2**num_cols;
         while (mask[num_cols] == 0) {
             unsigned char* board_cpy = copy(board_ptr);
-            zero_board(solution num_rows, num_cols);
+            zero_board(solution, num_rows, num_cols);
     
             for (uint8_t j = 0; j < num_cols; ++j) {
                 const int action = mask[j];
@@ -222,7 +221,7 @@ bool fre_solve_3(LightsOuts* puzzle, unsigned char* solution) {
             unsigned char* board_cpy = copy_T(board_ptr);
 
             // Don't transpose when zeroing the board
-            zero_board(solution num_rows, num_cols);
+            zero_board(solution, num_rows, num_cols);
     
             // i is directly the bit mask of how to toggle the top row
             // s.t. we toggle top_column[j] iff b_j == 1
@@ -276,17 +275,6 @@ In certain circumstances, Gaussian Elimination can beat FRE
 
 #### Irrelevance
 Lightsout Puzzles turn out to be a Gaussian elimination problem $mod$ the `num_colors`. Becuase of this modular arithmatic, plain Guassian Elimination does not work if `num_colors` is not prime, because there is a possibility that a row cannot be scaled to have a pivot of one. For example $2x = 1 (mod \ \ 6)$ has no solution. We could branch to a heavier analytical method like those that use Chinese Remainder Theorem or Smith Normal Form, but the given fallback is likely good enough, and can possibly optimized on its own.
-
-In other words, the application of `IsPrime()` is as follows,
-```cpp
-bool solve(...) {
-    if (IsPrime(num_colors)) {
-        // Do modular gaussian
-    } else {
-        // Do Class given method 
-    }
-}
-```
 
 However, since `num_lights` will only ever be 2 or 3, which are both prime numbers. This means that we never have to check for primeness because the number of light colors will always be prime.
 
