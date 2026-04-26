@@ -172,9 +172,9 @@ FRESolve2:
                 sw      $t5, 36($sp)                    # Save j to the stack
 
                 lw      $a0, 12($sp)                    # Load board buff directly into $a0
-                add     $a1, $0, $0                     # $a1 = 0
-                add     $a2, $t5, $0                    # $a2 = j
-                addi    $a3, $0, 1                      # $a4 = 0
+                move    $a1, $0                         # $a1 = 0
+                move    $a2, $t5                        # $a2 = j
+                move    $a3, $0                         # $a3 = 0
                 jal     toggle_light
 
                 lw      $a1, 8($sp)                     # Load solution from the stack
@@ -190,26 +190,68 @@ FRESolve2:
                     blt		$t5, $t1, FS2_N_Enum_For    # if j < num_cols then goto FS2_N_Enum_For
                 
             FS2_N_Enum_Rof:
-                lw      $t3, 28($sp)                    # Load permutations from the stack
-                # mask ($t4) already loaded
-                lw $a0, 24($sp)                         # $a0 = board_ptr | Premptively move for the copy call
-                lw $a1, 12($sp)                         # $a1 = board_buff | Premptively move for the copy call
-                lw $a2, 16($sp)                         # $a2 = num_rows | Premptively move for the copy call
-                move $a3, $t1                           # $a3 = num_cols | Already loaded, Premptively move for the copy call
-                add		$t4, $t4, 1                     # ++mask;
-            
+                lw      $t0, 16($sp)                    # Load num_rows from the stack
+                lw      $t1, 20($sp)                    # Load num_cols from the stack
+                li      $t5, 1                          # int i = 1;
             FS2_N_Iter_For_O:
+                bge		$t5, $t0, FS2_N_Iter_Rof_O      # if i >= num_rows then goto FS2_N_Iter_Rof_O
+
+                sw      $t5, 36($sp)                    # save i
+
+                li      $t6, 0                          # int j = 0;
                 FS2_N_Iter_For_I:
-                    # if (board_buff[i - 1][j] == 1)
-                    # toggle_light(board_buff, i, j, 1);
-                    # solution[j][i] = 1; // Remember to reverse the indexing
+                    bge		$t6, $t1, FS2_N_Iter_Rof_I      # if j >= num_cols then goto FS2_N_Iter_Rof_I
+
+                    # if (board_buff[(i - 1)*num_cols + j] == 1)
+                    lw		$a0, 0($sp)		                # Load board_buff from the stack directly into $a0 in case we call toggle_light
+                    sub     $t7, $t5, 1                     # $t7 = i - 1
+                    mul     $t7, $t7, $t1                   # $t7 = (i - 1)*num_cols
+                    add     $t7, $t7, $t6                   # $t7 = (i - 1)*num_cols + j
+                    add     $t7, $a0, $t7                   # $t7 = &board_buff[(i - 1)*num_cols + j]
+                    lw      $t7, 0($t7)                     # $t7 = board_buff[(i - 1)*num_cols + j]
+                    bne		$t7, 1, FS2_N_Iter_For_I_Inc    # if board_buff[i - 1][j] != 1 then goto FS2_N_Iter_For_I_Inc
+                    
+                    lw      $a1, 8($sp)                     # Load solution from the stack
+                    mul     $t7, $t5, $t1                   # $t7 = i*num_cols
+                    add     $t7, $t7, $t6                   # $t7 = i*num_cols + j
+                    add     $t7, $a1, $t7                   # $t7 = &solution[(i - 1)*num_cols + j]
+                    li      $a3, 1                          # $a3 = 1 | Premptively load for the call for toggle_light
+                    sw      $a3, 0($t7)                     # solution[i][j] = 1;
+
+                    sw      $t6, 40($sp)                    # Save j to the stack
+
+                    # $a0 = board_buff is already loaded
+                    move    $a1, $t5                        # $a1 = i
+                    move    $a2, $t6                        # $a2 = j
+                    # $a3 = 1 is already loaded
+                    jal     toggle_light                    # toggle_light(board_buff, i, j, 1);
+
+                    lw      $t6, 40($sp)                    # Load j from the stack
+                    FS2_N_Iter_For_I_Inc:
+                        addi    $t6, $t6, 1                 # ++j;
+                        j		FS2_N_Iter_For_I            # jump to FS2_N_Iter_For_I
+                        
                 FS2_N_Iter_Rof_I:
+                    lw      $t5, 36($sp)                    # Load i from the stack
+                    lw      $t0, 16($sp)                    # Load num_rows from the stack
+                    lw      $t1, 20($sp)                    # Load num_cols from the stack
+                    addi    $t5 $t5, 1                      # ++i;
+                    j		FS2_N_Iter_For_O                # jump to FS2_N_Iter_For_O
+
             FS2_N_Iter_Rof_O:
-                # $a0 = board_buff
-                # $a1 = num_cols
-                # $a2 = num_rows
+                lw      $a0, 12($sp)                    # $a0 = board_buff
+                lw      $a1, 16($sp)                    # $a1 = num_rows
+                lw      $a2, 20($sp)                    # $a2 = num_cols
                 jal     board_done                      # $v0 = board_done(board_buff, num_cols, num_rows)
-                # Reload all of the things we need
+
+                # Reload all of the things we need for the next iteration
+                lw      $t3, 28($sp)                    # Load permutations from the stack
+                lw      $t4, 32($sp)                    # Load mask from the stack
+                lw      $a0, 24($sp)                    # $a0 = board_ptr | Premptively moved for the copy call
+                lw      $a1, 12($sp)                    # $a1 = board_buff | Premptively moved for the copy call
+                lw      $a2, 16($sp)                    # $a2 = num_rows | Premptively moved for the copy call
+                lw      $a3, 20($sp)                    # $a3 = num_cols | Premptively moved for the copy call
+
                 bne		$v0, 1, FS2_N_Main_For          # Try next permutation iff !board_done(board_buff, num_cols, num_rows)
                 lw      $ra, 0($sp)                     # Otherwise, load $ra from the stack
                 add     $sp, $sp, 44                    # Deallocate 44 bytes from the stack
