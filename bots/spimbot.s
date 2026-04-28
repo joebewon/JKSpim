@@ -49,11 +49,23 @@ PLAYPEN_UNLOCK_ACK      = 0xffff0028  ## Playpen Unlock
 
 MMIO_STATUS             = 0xffff204c
 
-.data
+.align 4
+bunnies_info: .space 484                    # Space for the BunniesInfo Struct
 
-# If you want, you can use the following to detect if a bonk has happened.
-has_bonked: .byte 0
-.align 2 # to make sure that the next item starts at address div by 4 (may want to add this in other places)
+puzzle: .space 268                          # Space for the LightsOut Puzzle
+
+solution: .space 256                        # Space for the solution to the LightsOut Puzzle
+
+num_puzzles_requested: .word 0              # The number of puzzle that habve been requested
+
+.align 1
+ignore_timer: .byte 0
+
+has_bonked: .byte 0                         # Bonk Interrupt
+
+puzzle_received: .byte 0                    # Puzzle Received Interrupt
+
+fsm_state: .byte 0
 
 .text
 main:
@@ -65,12 +77,12 @@ main:
         or      $t4,    $t4,    1 # global enable
         mtc0    $t4     $12
 
-        li $t1, 0
-        sw $t1, ANGLE
-        li $t1, 1
-        sw $t1, ANGLE_CONTROL
-        li $t2, 0
-        sw $t2, VELOCITY
+        # li $t1, 0
+        # sw $t1, ANGLE
+        # li $t1, 1
+        # sw $t1, ANGLE_CONTROL
+        # li $t2, 0
+        # sw $t2, VELOCITY
 
         # YOUR CODE GOES HERE!!!!!!
 
@@ -134,17 +146,23 @@ interrupt_dispatch:                 # Interrupt:
 
 bonk_interrupt:
     sw      $0, BONK_ACK
-    #Fill in your bonk handler code here
+    
+    la      $t0, ignore_timer       # Ignore the next timer interrupt to prevent double FSM transitioning
+    li      $t1, 1
+    sw      $t1, 0($t0)
+
+    # FSM Transition function
+
     j       interrupt_dispatch      # see if other interrupts are waiting
 
 timer_interrupt:
     sw      $0, TIMER_ACK
-    #Fill in your timer interrupt code here
+    # Fill in your timer interrupt code here
     j       interrupt_dispatch      # see if other interrupts are waiting
 
 request_puzzle_interrupt:
     sw      $0, REQUEST_PUZZLE_ACK
-    #Fill in your request puzzle interrupt code here
+    # Fill in your request puzzle interrupt code here
     j       interrupt_dispatch      # see if other interrupts are waiting
 
 non_intrpt:                         # was some non-interrupt
@@ -200,6 +218,7 @@ print_xy:
   
   jr	$ra
 
+#########################################
 zero_board:
     li      $t0, 0              # row = 0
 
@@ -227,7 +246,6 @@ zero_done:
     jr      $ra
 
 #########################################
-
 board_done:
     li      $t0, 0
 
