@@ -48,9 +48,14 @@ MMIO_STATUS             = 0xffff204c
 
 .data
 .align 4
-timestamp_can_unlock_enemy: .word 0               # The timestamp, in cycles, of when we can next unlock the enemy's playpen
+timestamp_can_unlock_enemy: .word 0                 # The timestamp, in cycles, of when we can next unlock the enemy's playpen
 
 time_between_playpens: .word 0                      # The number of cycles it would take to travel between the two playpens
+
+playpen_x: .word 0                                  # The x-cooridnate of our playpen
+playpen_y: .word 0                                  # The y-cooridnate of our playpen
+other_playpen_x: .word 0                            # The x-cooridnate of their playpen
+other_playpen_y: .word 0                            # The y-cooridnate of their playpen
 
 .align 1
 fsm_state: .byte 0                                  # Current state of the FSM
@@ -80,16 +85,13 @@ FSMTransitionFunction:
     beq     $t1, 3, FSM_3                           # if fsm_state == 3, go to FSM_3
 
     FSM_0:
-        jal     ChooseBunny                         # (bunny_x, bunny_y) = ChooseBunny() ### Possibly (bunny_coord, cycles_to_bunny) = ChooseBunny()
+        jal     PickBestBunny                       # (Bunny* best_bunny, float best_bunny_dist) = PickBestBunny()
 
-        #### Split coord if we go down that route ####
-        # and     $a0, $v0, 0x0000FFFF                # $a0 = bunny_x | Extract x coordinate
-        # and     $a1, $v0, 0xFFFF0000                # Extract shifted y coordinate
-        # srl     $a1, $a1, 16                        # $a1 = bunny_y | Unshift the y coordinate
-        # move    $a2, $v1                            # $a2 = cycles_to_bunny
-
-        move    $a0, $v0                            # $a0 = bunny_x
-        move    $a1, $v1                            # $a1 = bunny_y
+        lw      $a0, 0($v0)                         # $a0 = best_bunny->x
+        lw      $a1, 4($v0)                         # $a1 = best_bunny->y
+        # cvt.w.s $f0, $f0                            # $f0 = static_cast<int>(best_bunny_dist)
+        # mfc1    $a2, $f0                            # $a2 <-- $f0
+        # mul     $a2, $a2, 1000                      # $a2 = static_cast<int>(best_bunny_dist)*1000
         jal     Move                                # Move(); | Asynchronous Move
 
         la      $t0, fsm_state                      # $t0 = &fsm_state
@@ -106,10 +108,9 @@ FSMTransitionFunction:
         j       FSM_0                               # Pick a new bunny until you actually succesfully pick one up
 
         FSM_1_Bunny_Picked:
-            lw      $t0, PLAYPEN_LOCATION($0)       # $t0 = *playpen_location
-            and     $a0, $v0, 0x0000FFFF            # $a0 = playpen_x | Extract x coordinate
-            and     $a1, $v0, 0xFFFF0000            # Extract shifted y coordinate
-            srl     $a1, $a1, 16                    # $a1 = playpen_y | Unshift the y coordinate
+            la      $t0, playpen_x($0)              # $t0 = &other_playpen_x
+            lw      $a0, 0($t0)                     # $a0 = playpen_x | Extract x coordinate
+            and     $a1, 4($t0)                     # $a0 = playpen_y | Extract shifted y coordinate
             jal     Move                            # Move(); | Asynchronous Move
             
             li      $t1, 2                          # $t1 = 2
@@ -139,10 +140,9 @@ FSMTransitionFunction:
         j       FSM_0                               # Immediatly look for another bunny as we can't unlock their playpen anyway
 
         FSM_2_Sabotage:
-            lw      $t0, PLAYPEN_OTHER_LOCATION($0) # $t0 = *playpen_location
-            and     $a0, $v0, 0x0000FFFF            # $a0 = playpen_x | Extract x coordinate
-            and     $a1, $v0, 0xFFFF0000            # Extract shifted y coordinate
-            srl     $a1, $a1, 16                    # $a1 = playpen_y | Unshift the y coordinate
+            la      $t0, other_playpen_x($0)        # $t0 = &other_playpen_x
+            lw      $a0, 0($t0)                     # $a0 = other_playpen_x | Extract x coordinate
+            and     $a1, 4($t0)                     # $a1 = other_playpen_y | Extract shifted y coordinate
             jal     Move                            # Move(); | Asynchronous Move
 
             li      $t1, 3                          # $t1 = 3

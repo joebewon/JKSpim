@@ -143,23 +143,17 @@ interrupt_dispatch:                 # Interrupt:
 
 bonk_interrupt:
     sw      $0, BONK_ACK
-    
-    la      $t0, ignore_timer       # Ignore the next timer interrupt to prevent double FSM transitioning
-    li      $t1, 1
-    sw      $t1, 0($t0)
-
-    # FSM Transition function
-
+    #Fill in your bonk handler code here
     j       interrupt_dispatch      # see if other interrupts are waiting
 
 timer_interrupt:
     sw      $0, TIMER_ACK
-    # Fill in your timer interrupt code here
+    #Fill in your timer interrupt code here
     j       interrupt_dispatch      # see if other interrupts are waiting
 
 request_puzzle_interrupt:
     sw      $0, REQUEST_PUZZLE_ACK
-    # Fill in your request puzzle interrupt code here
+    #Fill in your request puzzle interrupt code here
     j       interrupt_dispatch      # see if other interrupts are waiting
 
 non_intrpt:                         # was some non-interrupt
