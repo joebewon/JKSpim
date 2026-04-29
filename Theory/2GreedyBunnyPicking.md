@@ -29,7 +29,7 @@ PickBestBunny():
   let biggest_ratio = 0
   for b in B:
     // Don't consider if not in B'
-    if b.cycles_until_jump >= b.cycles_until_reach:
+    if b.cycles_until_jump <= b.cycles_until_reach:
       continue
     
     // Compute R(b)
@@ -86,7 +86,7 @@ PickBestResult PickBestBunny() {
 
         float cycles_from_bot_to_bunny = pythag_bot_to_bunny(b);
 
-        if (b->remaining_cycles >= cycles_from_bot_to_bunny) continue;
+        if (b->remaining_cycles <= cycles_from_bot_to_bunny) continue;
 
         float cycles_from_bunny_to_playpen = pythag_bunny_to_playpen(b);
 

@@ -86,25 +86,28 @@ PickBestBunny:
         pythag  $f3, $t3                    # <$f3!> float cycles_from_bot_to_bunny = ...;
 
         lw      $t4, 12($t3)                # $t4 = b->remaining_cycles;
-        cvt.s.w $f4, $t4                    # $f4 = static_cast<float>(b->remaining_cycles)
+        mtc1    $t4, $f4                    # $f4 <-- $t4
+        cvt.s.w $f4, $f4                    # $f4 = static_cast<float>(b->remaining_cycles)
 
-        c.le.s  $f3, $f4                    # FPCond = cycles_from_bot_to_bunny <= b->remaining_cycles
-        bc1t    PBB_For_Inc                 # if (b->remaining_cycles {$f4} >= cycles_from_bot_to_bunny {$f3}) continue;
+        c.le.s  $f4, $f3                    # FPCond = b->remaining_cycles <= cycles_from_bot_to_bunny
+        bc1t    PBB_For_Inc                 # if (b->remaining_cycles {$f4} <= cycles_from_bot_to_bunny {$f3}) continue;
 
         pythag  $f4, $t3                    # <$f4> float cycles_from_bunny_to_playpen = ...;
 
         add.s   $f4, $f3, $f4               # <$f4> float travel_time = cycles_from_bot_to_bunny + cycles_from_bunny_to_playpen;
         lw      $t4, 8($t3)                 # $t4! = b->weight
-        cvt.s.w $f5, $t4                    # $f5 = static_cast<float>(b->weight)
+        mtc1    $t4, $f5                    # $f5 <-- $t4
+        cvt.s.w $f5, $f5                    # $f5 = static_cast<float>(b->weight)
         div.s   $f5, $f5, $f4               # <$f5!> float ratio = static_cast<float>(b->weight) / travel_time;
 
         PBB_For_If:
             c.le.s  $f5, $f2                # FPCond = ratio <= biggest_ratio
             bc1t    PBB_For_Elif            # if ratio <= biggest_ratio, goto PBB_For_Elif
 
-            mov.s   $f0, $f5                # biggest_ratio = ratio;
+            mov.s   $f2, $f5                # biggest_ratio = ratio;
             move    $v0, $t3                # best_bunny = b;
-            mov.s   $f2, $f3                # best_bunny_dist = cycles_from_bot_to_bunny;
+            mov.s   $f0, $f3                # best_bunny_dist = cycles_from_bot_to_bunny;
+            lw      $t5, 8($v0)             # $t5! = best_bunny->weight
 
             j       PBB_For_Inc
         PBB_For_Elif:
@@ -112,13 +115,17 @@ PickBestBunny:
             bc1f    PBB_For_Inc             # if ratio != biggest_ratio, goto PBB_For_Inc
             ble     $t4, $t5, PBB_For_Inc   # if b->weight <= best_bunny->weight, goto PBB_For_Inc
 
-            mov.s   $f0, $f5                # biggest_ratio = ratio;
+            mov.s   $f2, $f5                # biggest_ratio = ratio;
             move    $v0, $t3                # best_bunny = b;
-            mov.s   $f2, $f3                # best_bunny_dist = cycles_from_bot_to_bunny;
+            mov.s   $f0, $f3                # best_bunny_dist = cycles_from_bot_to_bunny;
+            lw      $t5, 8($v0)             # $t5! = best_bunny->weight
+
 
         PBB_For_Inc:
             add     $t2, $t2, 1             # ++i;
-            blt		$t2, $t1, PBB_For     # if i < bunnies_info->num_bunnies then goto PBB_For
+            blt		$t2, $t1, PBB_For       # if i < bunnies_info->num_bunnies then goto PBB_For
+
+        jr      $ra                         # return { best_bunny, best_bunny_dist };
 
 # PickBestBunny:
 #     la      $t0, bunnies_info
