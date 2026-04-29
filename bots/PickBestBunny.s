@@ -49,6 +49,9 @@ MMIO_STATUS             = 0xffff204c
 .align 4
 bunnies_info: .space 484                    # Space for the BunniesInfo Struct
 
+playpen_x: .word 0                          # The x-cooridnate of our playpen
+playpen_y: .word 0                          # The y-cooridnate of our playpen
+
 .text
 
 # @function
@@ -73,7 +76,6 @@ PickBestBunny:
     lw      $t1, 0($t0)                     # <$t1!> int num_bunnies = bunnies_info->num_bunnies;
 
     add     $v0, $t0, 4                     # <$v0!> Bunny* best_bunny = &bunnies_info->info[0];
-    lw      $t5, 8($v0)                     # $t5! = best_bunny->weight
     mtc1    $zero, $f0                      # <$f0!> float best_bunny_dist = 0.0f;
     mtc1    $zero, $f2                      # <$f2!> float biggest_ratio = 0.0f;
     
@@ -83,7 +85,23 @@ PickBestBunny:
         add     $t3, $t0, $t3               # $t3 = bunnies_info + i*16
         add     $t3, $t3, 4                 # <$t3!> Bunny* b = &bunnies_info->info[i];
 
-        pythag  $f3, $t3                    # <$f3!> float cycles_from_bot_to_bunny = ...;
+        # <$f3!> float cycles_from_bot_to_bunny = sqrt((bot->x - b->x)**2 + (bot->y - b->y)**2);
+        lw      $t4, 0($t3)                 # $t4 = b->x
+        lw      $t5, BOT_X($0)              # $t5 = bot->x
+        sub     $t4, $t5, $t4               # $t4 = bot->x - b->x
+        mtc1    $t4, $f3                    # $f3 <-- bot->x - b->x
+        cvt.s.w $f3, $f3                    # $f3 = static_cast<float>(bot->x - b->x)
+        mul.s   $f3, $f3, $f3               # $f3 = static_cast<float>(bot->x - b->x)**2
+
+        lw      $t4, 4($t3)                 # $t4 = b->y
+        lw      $t5, BOT_Y($0)              # $t5 = bot->y
+        sub     $t4, $t5, $t4               # $t4 = bot->y - b->y
+        mtc1    $t4, $f4                    # $f4 <-- bot-y - b->y
+        cvt.s.w $f4, $f4                    # $f4 = static_cast<float>(bot-y - b->y)
+        mul.s   $f4, $f4, $f4               # $f4 = static_cast<float>(bot-y - b->y)**2
+
+        add.s   $f3, $f4, $f3               # $f3 = static_cast<float>(bot->x - b->x)**2 + static_cast<float>(bot->y - b->y)**2
+        sqrt.s  $f3, $f3                    # <$f3!> float cycles_from_bot_to_bunny = sqrt((bot->x - b->x)**2 + (bot->y - b->y)**2);
 
         lw      $t4, 12($t3)                # $t4 = b->remaining_cycles;
         mtc1    $t4, $f4                    # $f4 <-- $t4
@@ -92,7 +110,25 @@ PickBestBunny:
         c.le.s  $f4, $f3                    # FPCond = b->remaining_cycles <= cycles_from_bot_to_bunny
         bc1t    PBB_For_Inc                 # if (b->remaining_cycles {$f4} <= cycles_from_bot_to_bunny {$f3}) continue;
 
-        pythag  $f4, $t3                    # <$f4> float cycles_from_bunny_to_playpen = ...;
+        # <$f4> float cycles_from_bunny_to_playpen = sqrt((playpen_x - b->x)**2 + (playpen_y - b->y)**2);
+        lw      $t4, 0($t3)                 # $t4 = b->x
+        la      $t5, playpen_x              # $t5 = &playpen_x
+        lw      $t5, 0($t5)                 # $t5 = playpen_x
+        sub     $t4, $t5, $t4               # $t4 = playpen_x - b->x
+        mtc1    $t4, $f4                    # $f4 <-- playpen_x - b->x
+        cvt.s.w $f4, $f4                    # $f4 = static_cast<float>(playpen_x - b->x)
+        mul.s   $f4, $f4, $f4               # $f4 = static_cast<float>(playpen_x - b->x)**2
+
+        lw      $t4, 4($t3)                 # $t4 = b->y
+        la      $t5, playpen_y              # $t5 = &playpen_y
+        lw      $t5, 0($t5)                 # $t5 = playpen_y
+        sub     $t4, $t5, $t4               # $t4 = playpen_y - b->y
+        mtc1    $t4, $f5                    # $f5 <-- playpen_y - b->y
+        cvt.s.w $f5, $f5                    # $f5 = static_cast<float>(playpen_y - b->y)
+        mul.s   $f5, $f5, $f5               # $f5 = static_cast<float>(playpen_y - b->y)**2
+
+        add.s   $f4, $f4, $f5               # $f3 = static_cast<float>(playpen_x - b->x)**2 + static_cast<float>(playpen_y - b->y)**2
+        sqrt.s  $f4, $f4                    # # <$f4> float cycles_from_bunny_to_playpen = sqrt((playpen_x - b->x)**2 + (playpen_y - b->y)**2);
 
         add.s   $f4, $f3, $f4               # <$f4> float travel_time = cycles_from_bot_to_bunny + cycles_from_bunny_to_playpen;
         lw      $t4, 8($t3)                 # $t4! = b->weight
@@ -107,18 +143,17 @@ PickBestBunny:
             mov.s   $f2, $f5                # biggest_ratio = ratio;
             move    $v0, $t3                # best_bunny = b;
             mov.s   $f0, $f3                # best_bunny_dist = cycles_from_bot_to_bunny;
-            lw      $t5, 8($v0)             # $t5! = best_bunny->weight
 
             j       PBB_For_Inc
         PBB_For_Elif:
             c.eq.s  $f5, $f2                # FPCond = ratio == biggest_ratio
             bc1f    PBB_For_Inc             # if ratio != biggest_ratio, goto PBB_For_Inc
+            lw      $t5, 8($v0)             # $t5 = best_bunny->weight
             ble     $t4, $t5, PBB_For_Inc   # if b->weight <= best_bunny->weight, goto PBB_For_Inc
 
             mov.s   $f2, $f5                # biggest_ratio = ratio;
             move    $v0, $t3                # best_bunny = b;
             mov.s   $f0, $f3                # best_bunny_dist = cycles_from_bot_to_bunny;
-            lw      $t5, 8($v0)             # $t5! = best_bunny->weight
 
 
         PBB_For_Inc:
