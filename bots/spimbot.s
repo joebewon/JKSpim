@@ -49,6 +49,7 @@ PLAYPEN_UNLOCK_ACK      = 0xffff0028  ## Playpen Unlock
 
 MMIO_STATUS             = 0xffff204c
 
+.data
 .align 4
 bunnies_info: .space 484                    # Space for the BunniesInfo Struct
 
@@ -59,13 +60,9 @@ solution: .space 256                        # Space for the solution to the Ligh
 num_puzzles_requested: .word 0              # The number of puzzle that habve been requested
 
 .align 1
-ignore_timer: .byte 0
-
 has_bonked: .byte 0                         # Bonk Interrupt
 
 puzzle_received: .byte 0                    # Puzzle Received Interrupt
-
-fsm_state: .byte 0
 
 .text
 main:
