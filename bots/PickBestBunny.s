@@ -50,52 +50,120 @@ MMIO_STATUS             = 0xffff204c
 bunnies_info: .space 484                    # Space for the BunniesInfo Struct
 
 .text
+
+# @function
+#
+# Chooses the best bunny to pursue based on the largest weight/travel-time ratio.
+# Ignores bunnies that cannot be reached before they jump. If two bunnies have
+# the same ratio, chooses the heavier bunny. Also returns the distance/time from
+# the bot to the chosen bunny.
+#
+# @UsedTemporaries:
+# - Integers: $t0, $t1, $t2, $t3, $t4, $t5
+# - Floating: $f2, $f3, $f4, $f5
+#
+# @Params: None
+#
+# @Returns:
+#   $v0 (Bunny*): best_bunny | A pointer to the optimal bunny
+#   $f0 (float): best_bunny_dist | The number of distance in cycles from the spimbot's current location to the best bunny
 PickBestBunny:
     la      $t0, bunnies_info
-    sw      $t0, SEARCH_BUNNIES($0)         # $t0 = bunnies_info
-    lw      $t1, 0($t0)                     # $t1 = bunnies_info->num_bunnies
-    add     $v0, $t0, 4                     # Bunny* best_bunny = &bunnies_info->info[0];
-    li      $v1, 0                          # float best_bunny_dist = 0;
-    li      $t2, 0                          # float biggest_ratio = 0;
+    sw      $t0, SEARCH_BUNNIES($0)         # <$t0!> BunniesInfo* bunnies_info = *SEARCH_BUNNIES;
+    lw      $t1, 0($t0)                     # <$t1!> int num_bunnies = bunnies_info->num_bunnies;
 
-    li      $t3, 0                          # int i = 0;
+    add     $v0, $t0, 4                     # <$v0!> Bunny* best_bunny = &bunnies_info->info[0];
+    lw      $t5, 8($v0)                     # $t5! = best_bunny->weight
+    mtc1    $zero, $f0                      # <$f0!> float best_bunny_dist = 0.0f;
+    mtc1    $zero, $f2                      # <$f2!> float biggest_ratio = 0.0f;
+    
+    move    $t2, $0                         # <$t2!> int i = 0;
     PBB_For:
-        pythag  $t4                         # $t4 = cycles_from_bot_to_bunny
+        mul     $t3, $t2, 16                # $t3 = i*16
+        add     $t3, $t0, $t3               # $t3 = bunnies_info + i*16
+        add     $t3, $t3, 4                 # <$t3!> Bunny* b = &bunnies_info->info[i];
 
-        mul     $t5, $t3, 16                # $t5 = i * 16
-        add     $t5, $t0, $t5               # $t5 = &bunnies_info[i]
-        add     $t5, $t5, 12                # $t5 = &bunnies_info[i]->remaining_cycles
-        lw      $t6, 0($t5)                 # $t5 = bunnies_info[i]->remaining_cycles
-        # Make $t5 floating somehow and also the bge floating somehow
-        bge     $t6, $t4, PBB_For_Inc       # if bunnies_info[i]->remaining_cycles >= cycles_from_bot_to_bunny, jump to PBB_For_Inc
+        pythag  $f3, $t3                    # <$f3!> float cycles_from_bot_to_bunny = ...;
 
-        pythag  $t6                         # $t6 = cycles_from_bunny_to_playpen
-        add.s   $t6, $t4, $t6               # float travel_time = cycles_from_bot_to_bunny + cycles_from_bunny_to_playpen
-        sub     $t5, $t5, 4                 # $t5 = &bunnies_info[i]->weight
-        lw      $t7, 0($t5)                 # $t7 = bunnies_info[i]->weight
-        div.s   $t6, $t7, $t6               # float ratio = bunnies_info[i]->weight / (cycles_from_bot_to_bunny + cycles_from_bunny_to_playpen);
+        lw      $t4, 12($t3)                # $t4 = b->remaining_cycles;
+        cvt.s.w $f4, $t4                    # $f4 = static_cast<float>(b->remaining_cycles)
+
+        c.le.s  $f3, $f4                    # FPCond = cycles_from_bot_to_bunny <= b->remaining_cycles
+        bc1t    PBB_For_Inc                 # if (b->remaining_cycles {$f4} >= cycles_from_bot_to_bunny {$f3}) continue;
+
+        pythag  $f4, $t3                    # <$f4> float cycles_from_bunny_to_playpen = ...;
+
+        add.s   $f4, $f3, $f4               # <$f4> float travel_time = cycles_from_bot_to_bunny + cycles_from_bunny_to_playpen;
+        lw      $t4, 8($t3)                 # $t4! = b->weight
+        cvt.s.w $f5, $t4                    # $f5 = static_cast<float>(b->weight)
+        div.s   $f5, $f5, $f4               # <$f5!> float ratio = static_cast<float>(b->weight) / travel_time;
 
         PBB_For_If:
-            ble		$t6, $t2, PBB_For_Elif  # if ratio <= biggest_ratio then goto PBB_For_Elif
-            
-            move    $t2, $t6                # biggest_ratio = ratio;
-            sub     $t5, $t5, 8             # $t5 = &bunnies_info[0]
-            move    $v0, $t5                # best_bunny = bunnies_info[0];
-            move    $v1, $t4                # best_bunny_dist = cycles_from_bot_to_bunny;
+            c.le.s  $f5, $f2                # FPCond = ratio <= biggest_ratio
+            bc1t    PBB_For_Elif            # if ratio <= biggest_ratio, goto PBB_For_Elif
+
+            mov.s   $f0, $f5                # biggest_ratio = ratio;
+            move    $v0, $t3                # best_bunny = b;
+            mov.s   $f2, $f3                # best_bunny_dist = cycles_from_bot_to_bunny;
 
             j       PBB_For_Inc
         PBB_For_Elif:
-            bne     $t6, $t2, PBB_For_Inc   # if ratio != biggest_ratio then goto PBB_For_Inc
-            lw      $t8, 8($v0)             # $t8 = best_bunny->weight
-            ble     $t7, $t8, PBB_For_Inc   # if weight <= best_bunny->weight then goto PBB_For_Inc
+            c.eq.s  $f5, $f2                # FPCond = ratio == biggest_ratio
+            bc1f    PBB_For_Inc             # if ratio != biggest_ratio, goto PBB_For_Inc
+            ble     $t4, $t5, PBB_For_Inc   # if b->weight <= best_bunny->weight, goto PBB_For_Inc
 
-            move    $t2, $t6                # biggest_ratio = ratio;
-            sub     $t5, $t5, 8             # $t5 = &bunnies_info[0]
-            move    $v0, $t5                # best_bunny = bunnies_info[0];
-            move    $v1, $t4                # best_bunny_dist = cycles_from_bot_to_bunny;
+            mov.s   $f0, $f5                # biggest_ratio = ratio;
+            move    $v0, $t3                # best_bunny = b;
+            mov.s   $f2, $f3                # best_bunny_dist = cycles_from_bot_to_bunny;
 
         PBB_For_Inc:
-            add     $t4, $t4, 1             # ++i;
-            blt		$t4, $t1, PBB_For       # if i < bunnies_info->num_bunnies then goto PBB_For
-        
+            add     $t2, $t2, 1             # ++i;
+            blt		$t2, $t1, PBB_For     # if i < bunnies_info->num_bunnies then goto PBB_For
 
+# PickBestBunny:
+#     la      $t0, bunnies_info
+#     sw      $t0, SEARCH_BUNNIES($0)         # $t0 = bunnies_info
+#     lw      $t1, 0($t0)                     # $t1 = bunnies_info->num_bunnies
+#     add     $v0, $t0, 4                     # Bunny* best_bunny = &bunnies_info->info[0];
+#     li      $v1, 0                          # float best_bunny_dist = 0;
+#     li      $t2, 0                          # float biggest_ratio = 0;
+
+#     li      $t3, 0                          # int i = 0;
+#     PBB_For:
+#         pythag  $t4                         # $t4 = cycles_from_bot_to_bunny
+
+#         mul     $t5, $t3, 16                # $t5 = i * 16
+#         add     $t5, $t0, $t5               # $t5 = &bunnies_info[i]
+#         add     $t5, $t5, 12                # $t5 = &bunnies_info[i]->remaining_cycles
+#         lw      $t6, 0($t5)                 # $t5 = bunnies_info[i]->remaining_cycles
+#         # Make $t5 floating somehow and also the bge floating somehow
+#         bge     $t6, $t4, PBB_For_Inc       # if bunnies_info[i]->remaining_cycles >= cycles_from_bot_to_bunny, jump to PBB_For_Inc
+
+#         pythag  $t6                         # $t6 = cycles_from_bunny_to_playpen
+#         add.s   $t6, $t4, $t6               # float travel_time = cycles_from_bot_to_bunny + cycles_from_bunny_to_playpen
+#         sub     $t5, $t5, 4                 # $t5 = &bunnies_info[i]->weight
+#         lw      $t7, 0($t5)                 # $t7 = bunnies_info[i]->weight
+#         div.s   $t6, $t7, $t6               # float ratio = bunnies_info[i]->weight / (cycles_from_bot_to_bunny + cycles_from_bunny_to_playpen);
+
+#         PBB_For_If:
+#             ble		$t6, $t2, PBB_For_Elif  # if ratio <= biggest_ratio then goto PBB_For_Elif
+            
+#             move    $t2, $t6                # biggest_ratio = ratio;
+#             sub     $t5, $t5, 8             # $t5 = &bunnies_info[0]
+#             move    $v0, $t5                # best_bunny = bunnies_info[0];
+#             move    $v1, $t4                # best_bunny_dist = cycles_from_bot_to_bunny;
+
+#             j       PBB_For_Inc
+#         PBB_For_Elif:
+#             bne     $t6, $t2, PBB_For_Inc   # if ratio != biggest_ratio then goto PBB_For_Inc
+#             lw      $t8, 8($v0)             # $t8 = best_bunny->weight
+#             ble     $t7, $t8, PBB_For_Inc   # if weight <= best_bunny->weight then goto PBB_For_Inc
+
+#             move    $t2, $t6                # biggest_ratio = ratio;
+#             sub     $t5, $t5, 8             # $t5 = &bunnies_info[0]
+#             move    $v0, $t5                # best_bunny = bunnies_info[0];
+#             move    $v1, $t4                # best_bunny_dist = cycles_from_bot_to_bunny;
+
+#         PBB_For_Inc:
+#             add     $t3, $t3, 1             # ++i;
+#             blt		$t4, $t1, PBB_For     # if i < bunnies_info->num_bunnies then goto PBB_For
