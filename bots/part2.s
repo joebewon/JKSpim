@@ -43,13 +43,33 @@ EX_CARRY_LIMIT_ACK      = 0xffff002c  ## Exceeding Carry Limit
 MMIO_STATUS             = 0xffff204c
 
 .data
-
+puzzle_received: .word 0
+bunnies: .space 484 # allocate
 # If you want, you can use the following to detect if a bonk has happened.
 has_bonked: .byte 0
 .align 2 # to make sure that the next item starts at address div by 4 (may want to add this in other places)
+puzzle_data: .space 300
+.align 2
+puzzle_sol: .space 256
+puzzle_num: .word 0
+
+# MODIFICATIONS TO THIS FILE - KRRISH GANESH
+# MOVEMENT CODE
+
+# take in (x,y) as target
+# turn bot with absolute angle toward target 
+    # calculate cycles under target reached
+    # request timer interrupt for that many cycles
+    # set velocity to 10
+
+# note: if bonk interrupt before timer interrupt, ignore next timer interrupt
 
 .text
 main:
+
+        la $t0, puzzle_data
+        sw $t0, REQUEST_PUZZLE  # request immediately after starting
+
         # enable interrupts
         li      $t4     1
         or      $t4     $t4     TIMER_INT_MASK
@@ -66,6 +86,215 @@ main:
         sw $t2, VELOCITY
 
         # YOUR CODE GOES HERE!!!!!!
+
+
+    first_loop:
+     lw $t0, puzzle_received
+     beq $t0, $0, bunny_loop  # no puzzle -> go to finding bunnies
+     lw $a0, puzzle_num  # get puzzle_num
+
+     jal solve_puzzle
+
+     # after solving
+     lw $t1, puzzle_num # so we can match with which puzzle, this is why it wasn't solving but now fixed
+     add $t1, $t1, 1
+     sw $t1, puzzle_num # store after incrementing
+
+     sw $0, puzzle_received  # after solving, clear and request new immediately
+     la $t0, puzzle_data
+     sw $t0, REQUEST_PUZZLE
+
+coordinate_loop:
+    lw $t0, coordinate_received   # (x,y) received from puzzle interrupt handler
+    beq $t0, $0, cordinate_loop    
+    # turn bot with absolute angle toward target
+    # calculate cycles until target reached
+    # request timer interrupt for that many cycles
+    # set velocity to 10
+    if bot has absolute angle:
+        sw $t2, ANGLE_CONTROL # absolute angle
+    
+    calculate num. cycles until target reached and store in $t3
+        sw $t3, TIMER  # request timer interrupt for that many cycles
+        sw $t2, VELOCITY # set velocity to 10
+
+bunny_loop:
+    la $s4, bunnies        
+    sw $s4, SEARCH_BUNNIES   
+
+wait_for_bunnies:
+    lw $s5, 0($s4)  # how many bunnies
+    beq $s5, $0, bunny_loop
+    li $t4, 0  # start at 0
+
+find_bunny: # make sure bunny won't hop in next 100,000 cycles
+    li $t0, 16
+    mul $t0, $t4, $t0  # index * 16
+
+    add $t0, $s4, $t0  # add base address
+    add $t0, $t0, 4  # find address of bunny
+
+    # get current time and bunny's next hop time
+    lw $t5, TIMER
+    lw $t6, 12($t0) 
+
+    sub $t6, $t6, $t5 # subtract current time from next hop time, how much time / cycles we have left
+    li $t7, 100000 # 100,000 cycles
+    bge $t6, $t7, found_bunny # make sure 100k+ remaining cycles
+
+    add $t4, $t4, 1   # index increment
+    blt $t4, $s5, find_bunny  # loop to find next bunny and check
+    addi $t0, $s4, 4   # use bunnies[0] if no bunny valid
+    j found_bunny
+
+found_bunny:
+    lw $s0, 0($t0)
+    lw $s1, 4($t0)
+
+# dealing with x-coordinate
+x_loop:
+    lw $t8, puzzle_received
+    beq $t8, $0, cont_x_loop # modify
+
+cont_x_loop:
+    lw $t1, BOT_X # curr. x
+    beq $t1, $s0, stop_x # has bot reached bunny?
+
+    blt $t1, $s0, move_right # current position < bunny's position
+    li $t2, 180  # if not, then we have to go other way
+    j move_x
+
+move_right:
+    li $t2, 0
+
+move_x:
+    # set angle and turn it
+    sw $t2, ANGLE  
+    li $t2, 1
+    sw $t2, ANGLE_CONTROL
+    li $t2, 10
+    sw $t2, VELOCITY
+    j x_loop # until reach bunny's x-coordinate
+
+stop_x:
+    sw $0, VELOCITY   # stop if we have reached
+
+# dealing with y-coordinate
+y_loop:
+    lw $t1, BOT_Y # curr. y
+    beq $t1, $s1, stop_y # has bot reached bunny?
+
+    blt $t1, $s1, move_south # current position < bunny's position
+    li $t2, 270  # if not, then we have to go other way
+    j move_y
+
+move_south:
+    li $t2, 90
+
+move_y:
+    # set angle and turn it
+    sw $t2, ANGLE  
+    li $t2, 1
+    sw $t2, ANGLE_CONTROL
+    li $t2, 10
+    sw $t2, VELOCITY
+    j y_loop # until reach bunny's x-coordinate
+
+stop_y:
+    sw $0, VELOCITY   # stop if we have reached
+    li $t1, 1
+    sw $t1, CATCH_BUNNY
+
+
+
+# playpen logic
+
+    lw $t0, PLAYPEN_LOCATION
+    srl $s2, $t0, 16 # for playpen X (upper 16 bits)
+    sll $s3, $t0, 16 
+    srl $s3, $s3, 16  # for playpen Y (lower 16 bits)
+
+# horizontal movement
+playpen_x:
+
+    lw $t1, BOT_X   # get X pos.
+    beq $t1, $s2, stop_x_and_move_y  # if X reached, move to Y
+    blt $t1, $s2, go_right  #  current position < target position
+    li $t2, 180 # else go left
+    j deliver_x
+
+go_right:
+    li $t2, 0
+
+deliver_x:
+    sw $t2, ANGLE  
+    li $t3, 1
+    sw $t3, ANGLE_CONTROL # absolute angle
+    li $t3, 10
+    sw $t3, VELOCITY
+    j playpen_x # until we match x-coord.
+
+stop_x_and_move_y:
+    sw $0, VELOCITY
+
+
+# vertical playpen
+playpen_y:
+
+    lw $t1, BOT_Y   # get X pos.
+    beq $t1, $s3, stop_y_and_deliver  # if X reached, move to Y
+    blt $t1, $s3, go_south  #  current position < target position
+    li $t2, 270 # else go up
+    j deliver_y
+
+go_south:
+    li $t2, 90
+
+deliver_y:
+    sw $t2, ANGLE  
+    li $t3, 1
+    sw $t3, ANGLE_CONTROL # absolute angle
+    li $t3, 10
+    sw $t3, VELOCITY
+    j playpen_y # until we match y-coord.
+
+stop_y_and_deliver:
+    sw $0, VELOCITY
+
+    lw $t1, NUM_BUNNIES_CARRIED 
+    sw $t1, PUT_BUNNIES_IN_PLAYPEN
+      
+    j first_loop  
+
+solve_puzzle:
+    sub $sp, $sp, 4  # allocate
+    sw $ra, 0($sp)
+    sw $s0, 4($sp)  # puzzle_num
+    move $s0, $a0
+
+    # zero out
+    la $t0, puzzle_data
+    lw $a0, 0($t0)  # num_rows
+    lw $a1, 4($t0) # num_cols
+    la $a2, puzzle_sol
+    jal zero_board
+
+    # solve 
+    la $a0, puzzle_data
+    la $a1, puzzle_sol
+    li $a2, 0
+    li $a3, 0
+    jal solve
+
+    sw $s0, CURRENT_PUZZLE  # before submitting so can be matched
+
+    la $t0, puzzle_sol
+    sw $t0, SUBMIT_SOLUTION    # submit soln!
+
+    lw $ra, 0($sp)   # deallocate
+    lw $s0, 4($sp)
+    add $sp, $sp, 4
+    jr $ra
 
 
 # Once done, enter an infinite loop so that your bot can be graded by QtSpimbot once 10,000,000 cycles have elapsed
@@ -128,6 +357,7 @@ interrupt_dispatch:                 # Interrupt:
 bonk_interrupt:
     sw      $0, BONK_ACK
     #Fill in your bonk handler code here
+    sw $0, VELOCITY
     j       interrupt_dispatch      # see if other interrupts are waiting
 
 timer_interrupt:
@@ -138,6 +368,8 @@ timer_interrupt:
 request_puzzle_interrupt:
     sw      $0, REQUEST_PUZZLE_ACK
     #Fill in your request puzzle interrupt code here
+    li $t0, 1
+    sw $t0, puzzle_received
     j       interrupt_dispatch      # see if other interrupts are waiting
 
 non_intrpt:                         # was some non-interrupt
@@ -165,6 +397,11 @@ done:
     lw      $t3, 20($k0)
     lw      $t4, 24($k0)
     lw      $t5, 28($k0)
+    lw      $t6, 40($k0)
+    lw      $t7, 44($k0)
+    lw      $t8, 48($k0)
+    lw      $t9, 52($k0)   # add since we use
+    lw      $ra, 56($k0)
 
 .set noat
     move    $at, $k1        # Restore $at

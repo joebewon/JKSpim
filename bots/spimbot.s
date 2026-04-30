@@ -49,7 +49,17 @@ PLAYPEN_UNLOCK_ACK      = 0xffff0028  ## Playpen Unlock
 
 MMIO_STATUS             = 0xffff204c
 
+
 .data
+puzzle_received: .word 0
+bunnies: .space 484 # allocate
+# If you want, you can use the following to detect if a bonk has happened.
+has_bonked: .byte 0
+.align 2 # to make sure that the next item starts at address div by 4 (may want to add this in other places)
+puzzle_data: .space 300
+.align 2
+puzzle_sol: .space 256
+puzzle_num: .word 0
 
 # If you want, you can use the following to detect if a bonk has happened.
 has_bonked: .byte 0
@@ -57,6 +67,7 @@ has_bonked: .byte 0
 
 .text
 main:
+
         # enable interrupts
         li      $t4     1
         or      $t4     $t4     TIMER_INT_MASK
@@ -73,6 +84,7 @@ main:
         sw $t2, VELOCITY
 
         # YOUR CODE GOES HERE!!!!!!
+
 
 
 # Once done, enter an infinite loop so that your bot can be graded by QtSpimbot once 10,000,000 cycles have elapsed
@@ -135,6 +147,7 @@ interrupt_dispatch:                 # Interrupt:
 bonk_interrupt:
     sw      $0, BONK_ACK
     #Fill in your bonk handler code here
+    sw $0, VELOCITY
     j       interrupt_dispatch      # see if other interrupts are waiting
 
 timer_interrupt:
@@ -145,6 +158,8 @@ timer_interrupt:
 request_puzzle_interrupt:
     sw      $0, REQUEST_PUZZLE_ACK
     #Fill in your request puzzle interrupt code here
+    li $t0, 1
+    sw $t0, puzzle_received
     j       interrupt_dispatch      # see if other interrupts are waiting
 
 non_intrpt:                         # was some non-interrupt
@@ -172,6 +187,11 @@ done:
     lw      $t3, 20($k0)
     lw      $t4, 24($k0)
     lw      $t5, 28($k0)
+    lw      $t6, 40($k0)
+    lw      $t7, 44($k0)
+    lw      $t8, 48($k0)
+    lw      $t9, 52($k0)   # add since we use
+    lw      $ra, 56($k0)
 
 .set noat
     move    $at, $k1        # Restore $at
