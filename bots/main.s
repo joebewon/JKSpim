@@ -144,3 +144,16 @@ loop:
 # import kernel.s
 # import FSMTransitionFunction.s
 # import solve.s
+
+.data
+.align 4
+
+# Lookup Table for arctan2.
+# Set up as a 2d array s.t. the indices are deltaX and deltaY of the two points, where we use target - start
+# e.g. start is at (236, 85)
+#      target is at (27, 293)
+#      deltaX = 27 - 236 = -209
+#      deltaY = 293 - 85 = 208
+#      then theta = arctan2(deltaY / deltaX) := arctan2_lookup[deltaX][deltaY]
+# These numbers are directly represented as IEEE 754 Single Precision Floating Point Numbers 
+arctan2_lookup: .word 0
