@@ -76,7 +76,7 @@ FSMTransitionFunction:
     sw      $ra, 0($ra)                             # Save $ra to the stack
 
     la      $t0, fsm_state                          # $t0 = &fsm_state
-    lw		$t1, 0($t0)                             # Load the FSM State
+    lb		$t1, 0($t0)                             # Load the FSM State
 
     # Branch for each FSM State
     beq     $t1, 0, FSM_0                           # if fsm_state == 0, go to FSM_0
@@ -92,11 +92,12 @@ FSMTransitionFunction:
         # cvt.w.s $f0, $f0                            # $f0 = static_cast<int>(best_bunny_dist)
         # mfc1    $a2, $f0                            # $a2 <-- $f0
         # mul     $a2, $a2, 1000                      # $a2 = static_cast<int>(best_bunny_dist)*1000
+        # add     $a2, $a2, 10000                     # Add an arbitrary offset to take computation time into account
         jal     Move                                # Move(); | Asynchronous Move
 
         la      $t0, fsm_state                      # $t0 = &fsm_state
         li      $t1, 1                              # $t1 = 1
-        sw      $t1, 0($t0)                         # fsm_state = 1;
+        sb      $t1, 0($t0)                         # fsm_state = 1;
         j       FSM_Return                          # return;
     FSM_1:
         sw      $0, CATCH_BUNNY($0)
@@ -104,7 +105,7 @@ FSMTransitionFunction:
 
         beq     $t0, 0, FSM_1_Bunny_Picked          # if bunny was picked up, jump to FSM_1_Bunny_Picked
         la      $t0, fsm_state                      # $t0 = &fsm_state
-        sw      $0, 0($t0)                          # fsm_state = 0;
+        sb      $0, 0($t0)                          # fsm_state = 0;
         j       FSM_0                               # Pick a new bunny until you actually succesfully pick one up
 
         FSM_1_Bunny_Picked:
@@ -113,8 +114,9 @@ FSMTransitionFunction:
             and     $a1, 4($t0)                     # $a0 = playpen_y | Extract shifted y coordinate
             jal     Move                            # Move(); | Asynchronous Move
             
+            la      $t0, fsm_state                  # $t0 = &fsm_state
             li      $t1, 2                          # $t1 = 2
-            sw      $t1, 0($t0)                     # fsm_state = 2;
+            sb      $t1, 0($t0)                     # fsm_state = 2;
             j       FSM_Return                      # return;
     FSM_2:
         sw      $0, LOCK_PLAYPEN($0)                # Lock the playpen
@@ -136,7 +138,7 @@ FSMTransitionFunction:
         bgt     $t2, $t0, FSM_2_Sabotage            # if current_time + time_between_playpens > timestamp_can_unlock_enemy, jump to FSM_2_Sabotage
 
         la      $t0, fsm_state                      # $t0 = &fsm_state
-        sw      $0, 0($t0)                          # fsm_state = 0;
+        sb      $0, 0($t0)                          # fsm_state = 0;
         j       FSM_0                               # Immediatly look for another bunny as we can't unlock their playpen anyway
 
         FSM_2_Sabotage:
@@ -144,9 +146,10 @@ FSMTransitionFunction:
             lw      $a0, 0($t0)                     # $a0 = other_playpen_x | Extract x coordinate
             and     $a1, 4($t0)                     # $a1 = other_playpen_y | Extract shifted y coordinate
             jal     Move                            # Move(); | Asynchronous Move
-
+        
+            la      $t0, fsm_state                  # $t0 = &fsm_state
             li      $t1, 3                          # $t1 = 3
-            sw      $t1, 0($t0)                     # fsm_state = 3;
+            sb      $t1, 0($t0)                     # fsm_state = 3;
             j       FSM_Return                      # return;
     FSM_3:
         lw      $t0, UNLOCK_PLAYPEN($0)             # Unlock Opponent's Playpen
@@ -160,7 +163,7 @@ FSMTransitionFunction:
         
         FSM_3_Continue:
             la      $t0, fsm_state                  # $t0 = &fsm_state
-            sw      $0, 0($t0)                      # fsm_state = 0;
+            sb      $0, 0($t0)                      # fsm_state = 0;
             j       FSM_0                           # Immediatly look for the next bunny
 
     FSM_Return:

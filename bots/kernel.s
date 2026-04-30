@@ -1,6 +1,6 @@
 .data
 .align 1
-ignore_timer: .word 1
+has_timer: .byte 1
 
 # ======================== kernel code ================================
 .kdata
@@ -57,30 +57,40 @@ interrupt_dispatch:                 # Interrupt:
     j       done
 
 bonk_interrupt:
-    sw      $0, BONK_ACK
-    
-    la      $t0, ignore_timer       # Ignore the next timer interrupt to prevent double FSM transitioning
-    li      $t1, 1
-    sw      $t1, 0($t0)             # ignore_timer = true;
+    sw      $0, BONK_ACK                # Acknwoledge the bonk
+    sw      $0, VELOCITY                # Set the velocity to 0
 
-    # FSM Transition function
+    la      $t0, has_timer              # $t0 = &has_timer
+    sb      $0, 0($t0)                  # has_timer = false; | Ignore the next timer interrupt to prevent double FSM transitioning
 
-    j       interrupt_dispatch      # see if other interrupts are waiting
+    jal     FSMTransitionFunction       # Call delta
+
+    j       interrupt_dispatch          # see if other interrupts are waiting
 
 timer_interrupt:
-    sw      $0, TIMER_ACK
-    # Fill in your timer interrupt code here
-    j       interrupt_dispatch      # see if other interrupts are waiting
+    sw      $0, TIMER_ACK               # Acknowledge the timer interrupt
+    sw      $0, VELOCITY                # Set the velocity to 0
+
+    la      $t0, has_timer              # $t0 = &has_timer
+    lb		$t0, 0($t0)                 # $t0 = has_timer
+    beq     $t0, 0, interrupt_dispatch  # Shortcircuit if we are supposed to ignore this interrupt
+
+    jal     FSMTransitionFunction       # Call delta
+
+    j       interrupt_dispatch          # see if other interrupts are waiting
 
 request_puzzle_interrupt:
-    sw      $0, REQUEST_PUZZLE_ACK
-    # Fill in your request puzzle interrupt code here
-    j       interrupt_dispatch      # see if other interrupts are waiting
+    sw      $0, REQUEST_PUZZLE_ACK      # Acknowledge the puzzle request interrupt
 
-non_intrpt:                         # was some non-interrupt
+    li	    $t0, 1
+    sb	    $t0, puzzle_received        # Set the puzzle request interrupt flag to 1    
+    
+    j       interrupt_dispatch          # see if other interrupts are waiting
+
+non_intrpt:                             # was some non-interrupt
     li      $v0, PRINT_STRING
     la      $a0, non_intrpt_str
-    syscall                         # print out an error message
+    syscall                             # print out an error message
     # fall through to done
 
 done:
