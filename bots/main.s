@@ -89,13 +89,6 @@ main:
         or      $t4,    $t4,    1 # global enable
         mtc0    $t4     $12
 
-        # li $t1, 0
-        # sw $t1, ANGLE
-        # li $t1, 1
-        # sw $t1, ANGLE_CONTROL
-        # li $t2, 0
-        # sw $t2, VELOCITY
-
         # Save the playpen location to memory
         lw $t0, PLAYPEN_LOCATION
         and $t1, $t0, 0xFFFF0000
@@ -144,16 +137,4 @@ loop:
 # import kernel.s
 # import FSMTransitionFunction.s
 # import solve.s
-
-.data
-.align 4
-
-# Lookup Table for arctan2.
-# Set up as a 2d array s.t. the indices are deltaX and deltaY of the two points, where we use target - start
-# e.g. start is at (236, 85)
-#      target is at (27, 293)
-#      deltaX = 27 - 236 = -209
-#      deltaY = 293 - 85 = 208
-#      then theta = arctan2(deltaY / deltaX) := arctan2_lookup[deltaX][deltaY]
-# These numbers are directly represented as IEEE 754 Single Precision Floating Point Numbers 
-arctan2_lookup: .word 0
+# import arctan2lookup.s
