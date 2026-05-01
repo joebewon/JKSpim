@@ -137,8 +137,8 @@ find_bunny: # make sure bunny won't hop in next 100,000 cycles
     addi $t0, $s4, 4   # use bunnies[0] if no bunny valid
 
 found_bunny:
-    lw $s0, 0($t0)
-    lw $s1, 4($t0)
+    lw $a0, 0($t0)
+    lw $a1, 4($t0)
 
     jal move_to_xy
 
@@ -150,7 +150,7 @@ deliver_to_playpen:
     lw $t0, PLAYPEN_LOCATION
     srl $a0, $t0, 16 # for playpen X (upper 16 bits)
     sll $a1, $t0, 16  # remove upper bits
-    srl $a1, $s3, 16  # for playpen Y (lower 16 bits)
+    srl $a1, $a1, 16  # for playpen Y (lower 16 bits)
 
     # now move diagonally to playpen since we can move in both x and y at the same time
     jal move_to_xy
@@ -162,15 +162,57 @@ deliver_to_playpen:
 
 move_to_xy:
 # input (x,y) --> $a0, $a1
-# output: bot moves to (x,y)
-
-# need a xy_loop, to handle x and y as we move diagonally?
-# need to handle diagonal movement for up left, up right, down left, down right
+# output: bot moves to (x,y) using atan2 lookup table
 # handle relative to target
 # absolute angle move
 # TO-DO
 
 move_xy_loop:
+    lw $t0, BOT_X
+    lw $t1, BOT_Y
+
+    sub $t2, $a0, $t0 # deltaX = targetX - botX
+    sub $t3, $a1, $t1 # deltaY = targetY - botY
+
+    move $t4, $t2 # for atan2 lookup
+    slt $t6, $t4, $0
+    beq $t6, $0, deltax_nonneg 
+    sub $t4, $0, $t4 # abs(deltaX)
+
+deltax_nonneg:
+   move $t5, $t3 # for atan2 lookup
+   slt $t6, $t5, $0
+   beq $t6, $0, deltay_nonneg
+   sub $t5, $0, $t5 # abs(deltaY)
+
+deltay_nonneg:
+   li $t6, 4
+   bgt $t4, $t6, keep_moving 
+   bgt $t5, $t6, keep_moving
+
+
+keep_moving:
+    # calculate angle to target using atan2 lookup table
+    # set angle and velocity to move bot
+    # loop until we reach target (within some threshold)
+    li $t6, 601
+
+    mul $t9, $t2, $t6 # deltaX * 601
+    add $t9, $t9, $t3 # deltaX * 601 + deltaY
+    mul $t9, $t9, 4 # index * 4 (size of int)
+
+    la $t6, atan2lookup # base address of atan2 lookup table
+    add $t6, $t6, $t9 # address of angle
+    lw $t7, 0($t6) # angle
+
+    sw $t7, ANGLE # set angle
+    li $t8, 1
+    sw $t8, ANGLE_CONTROL # move
+    li $t8, 10 
+    sw $t8, VELOCITY
+
+    j move_xy_loop
+
 
 solve_puzzle:
     sub $sp, $sp, 8  # allocate
