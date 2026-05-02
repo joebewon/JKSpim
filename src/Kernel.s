@@ -10,12 +10,12 @@ unhandled_str:    .asciiz "Unhandled interrupt type\n"
 .ktext 0x80000180
 interrupt_handler:
 .set noat
-    move    $k1, $at        # Save $at
-                            # NOTE: Don't touch $k1 or else you destroy $at!
+    move    $k1, $at                    # Save $at
+                                        # NOTE: Don't touch $k1 or else you destroy $at!
 .set at
     la      $k0, chunkIH
-    sw      $a0, 0($k0)        # Get some free registers
-    sw      $v0, 4($k0)        # by storing them to a global variable
+    sw      $a0, 0($k0)                 # Get some free registers
+    sw      $v0, 4($k0)                 # by storing them to a global variable
     sw      $t0, 8($k0)
     sw      $t1, 12($k0)
     sw      $t2, 16($k0)
@@ -32,15 +32,15 @@ interrupt_handler:
     mflo    $t0
     sw      $t0, 36($k0)
 
-    mfc0    $k0, $13                # Get Cause register
+    mfc0    $k0, $13                    # Get Cause register
     srl     $a0, $k0, 2
-    and     $a0, $a0, 0xf           # ExcCode field
+    and     $a0, $a0, 0xf               # ExcCode field
     bne     $a0, 0, non_intrpt
 
 
-interrupt_dispatch:                 # Interrupt:
-    mfc0    $k0, $13                # Get Cause register, again
-    beq     $k0, 0, done            # handled all outstanding interrupts
+interrupt_dispatch:                     # Interrupt:
+    mfc0    $k0, $13                    # Get Cause register, again
+    beq     $k0, 0, done                # handled all outstanding interrupts
 
     and     $a0, $k0, BONK_INT_MASK     # is there a bonk interrupt?
     bne     $a0, 0, bonk_interrupt
@@ -51,7 +51,7 @@ interrupt_dispatch:                 # Interrupt:
     and     $a0 $k0 REQUEST_PUZZLE_INT_MASK
     bne     $a0 0 request_puzzle_interrupt
 
-    li      $v0, PRINT_STRING       # Unhandled interrupt types
+    li      $v0, PRINT_STRING           # Unhandled interrupt types
     la      $a0, unhandled_str
     syscall
     j       done
@@ -104,7 +104,7 @@ done:
     lw      $t0, 36($k0)
     mtlo    $t0
 
-    lw      $a0, 0($k0)             # Restore saved registers
+    lw      $a0, 0($k0)                 # Restore saved registers
     lw      $v0, 4($k0)
     lw      $t0, 8($k0)
     lw      $t1, 12($k0)
