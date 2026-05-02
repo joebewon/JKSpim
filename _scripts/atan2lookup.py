@@ -2,12 +2,12 @@ from math import atan2, degrees
 import os
 
 base = os.path.dirname(__file__)
-path = os.path.join(base, 'output', "atan2lookup.txt")
+path = os.path.join(base, 'output', "Atan2lookup.s")
 bound: int = 300
-directive = 'word'
+directive = '.half'
 
 with open(path, 'w') as f:
-    print('.data\n.align 4')
+    print('.data\n.align 2')
     f.write('.data\n.align 2\natan2lookup_begin:')
 
     # Top

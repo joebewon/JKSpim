@@ -17,42 +17,6 @@ puzzle_received: .byte 0                    # Puzzle Received Interrupt
 
 # @function
 #
-# Efficiently checks if a puzzle is solved
-#
-# @UsedTemporaries: $t0, $t1, $t2, $t3
-#
-# @Params:
-# - $a0 (unsigned char* board): Pointer to the board matrix we want to check completion for
-#
-# @Returns:
-# - $v0 (bool): Whether or not the puzzle is actually soved
-board_done_opt:
-    li      $t4, 240                                    # $t4 = 240 (15*16, the index of the first element of the last row.
-    add     $t4, $a0, $t4                               # $t4 = &board[15*16][0] equiv. $t4 = &board[15*16 + 0] equiv. $t4 = &board[15*16]
-
-    lwl     $t0, 0($t4)                                 # Load the first of the four words that make up the last row
-    lwr     $t0, 3($t4)
-
-    lwl     $t1, 4($t4)                                 # Load the second of the four words that make up the last row
-    lwr     $t1, 7($t4)
-
-    lwl     $t2, 8($t4)                                 # Load the third of the four words that make up the last row
-    lwr     $t2, 11($t4)
-
-    lwl     $t3, 12($t4)                                # Load the fourth of the four words that make up the last row
-    lwr     $t3, 15($t4)
-
-    or      $v0, $t0, $t1                               # $v0 = words[0] | words[1]
-    or      $v0, $v0, $t2                               # $v0 = words[0] | words[1] | words[2]
-    or      $v0, $v0, $t3                               # $v0 = words[0] | words[1] | words[2] | words[3]
-
-    slt     $v0, $0, $v0                                # $v0 = 0 < words[0] | words[1] | words[2] | words[3] ? 1 : 0
-    li      $t0, 1
-    sub     $v0, $t0, $v0                               # $v0 = !(words[0] | words[1] | words[2] | words[3])
-    j       $ra                                         # Return !(words[0] | words[1] | words[2] | words[3]);
-
-# @function
-#
 # Requests and solves a puzzle efficiently
 #
 # @UsedTemporaries: $t0, $t1, $t2, $t4, $a0, $a1, $a2, $a3
@@ -255,7 +219,7 @@ FRESolve2:
                 lw      $a0, 12($sp)                        # $a0 = board_buff
                 lw      $a1, 16($sp)                        # $a1 = num_rows
                 lw      $a2, 20($sp)                        # $a2 = num_cols
-                jal     board_done                          # $v0 = board_done(board_buff, num_cols, num_rows)
+                jal     BoardDone                          # $v0 = BoardDone(board_buff, num_cols, num_rows)
 
                 # Reload all of the things we need for the next iteration
                 lw      $t3, 28($sp)                        # Load permutations from the stack
@@ -265,7 +229,7 @@ FRESolve2:
                 lw      $a2, 16($sp)                        # $a2 = num_rows | Premptively moved for the copy call
                 lw      $a3, 20($sp)                        # $a3 = num_cols | Premptively moved for the copy call
 
-                bne		$v0, 1, FS2_N_Main_For              # Try next permutation iff !board_done(board_buff, num_cols, num_rows)
+                bne		$v0, 1, FS2_N_Main_For              # Try next permutation iff !BoardDone(board_buff, num_cols, num_rows)
                 lw      $ra, 0($sp)                         # Otherwise, load $ra from the stack
                 add     $sp, $sp, 44                        # Deallocate 44 bytes from the stack
                 jr      $ra
@@ -387,7 +351,7 @@ FRESolve2:
                 lw      $a0, 12($sp)                        # $a0 = board_buff
                 lw      $a1, 16($sp)                        # $a1 = num_rows
                 lw      $a2, 20($sp)                        # $a2 = num_cols
-                jal     board_done                          # $v0 = board_done(board_buff, num_cols, num_rows)
+                jal     BoardDone                          # $v0 = BoardDone(board_buff, num_cols, num_rows)
 
                 # Reload all of the things we need for the next iteration
                 lw      $t3, 28($sp)                        # Load permutations from the stack
@@ -397,7 +361,7 @@ FRESolve2:
                 lw      $a2, 16($sp)                        # $a2 = num_rows | Premptively moved for the copy call
                 lw      $a3, 20($sp)                        # $a3 = num_cols | Premptively moved for the copy call
 
-                bne		$v0, 1, FS2_T_Main_For              # Try next permutation iff !board_done(board_buff, num_cols, num_rows)
+                bne		$v0, 1, FS2_T_Main_For              # Try next permutation iff !BoardDone(board_buff, num_cols, num_rows)
                 lw      $ra, 0($sp)                         # Otherwise, load $ra from the stack
                 add     $sp, $sp, 44                        # Deallocate 44 bytes from the stack
                 jr      $ra
@@ -422,3 +386,39 @@ FRESolve2:
 # @Returns:
 # - $v0 (bool): Whether or not the puzzle is solvable. If it is, the solution will be at `@solution`.
 FRESolve3:
+
+# @function
+#
+# Efficiently checks if a puzzle is solved
+#
+# @UsedTemporaries: $t0, $t1, $t2, $t3
+#
+# @Params:
+# - $a0 (unsigned char* board): Pointer to the board matrix we want to check completion for
+#
+# @Returns:
+# - $v0 (bool): Whether or not the puzzle is actually soved
+BoardDone:
+    li      $t4, 240                                    # $t4 = 240 (15*16, the index of the first element of the last row.
+    add     $t4, $a0, $t4                               # $t4 = &board[15*16][0] equiv. $t4 = &board[15*16 + 0] equiv. $t4 = &board[15*16]
+
+    lwl     $t0, 0($t4)                                 # Load the first of the four words that make up the last row
+    lwr     $t0, 3($t4)
+
+    lwl     $t1, 4($t4)                                 # Load the second of the four words that make up the last row
+    lwr     $t1, 7($t4)
+
+    lwl     $t2, 8($t4)                                 # Load the third of the four words that make up the last row
+    lwr     $t2, 11($t4)
+
+    lwl     $t3, 12($t4)                                # Load the fourth of the four words that make up the last row
+    lwr     $t3, 15($t4)
+
+    or      $v0, $t0, $t1                               # $v0 = words[0] | words[1]
+    or      $v0, $v0, $t2                               # $v0 = words[0] | words[1] | words[2]
+    or      $v0, $v0, $t3                               # $v0 = words[0] | words[1] | words[2] | words[3]
+
+    slt     $v0, $0, $v0                                # $v0 = 0 < words[0] | words[1] | words[2] | words[3] ? 1 : 0
+    li      $t0, 1
+    sub     $v0, $t0, $v0                               # $v0 = !(words[0] | words[1] | words[2] | words[3])
+    j       $ra                                         # Return !(words[0] | words[1] | words[2] | words[3]);
