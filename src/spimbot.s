@@ -58,6 +58,7 @@
             or      $t4, $t4, TIMER_INT_MASK
             or      $t4, $t4, BONK_INT_MASK                         # enable bonk interrupt
             or      $t4, $t4, REQUEST_PUZZLE_INT_MASK               # enable puzzle interrupt
+            or      $t4, $t4, PLAYPEN_UNLOCK_INT_MASK               # enable playpen unlock interrupt
             or      $t4, $t4, 1                                     # global enable
             mtc0    $t4, $12
 
@@ -139,7 +140,7 @@
             cvt.w.s $f0, $f0                            # $f0 = static_cast<int>(best_bunny_dist)
             mfc1    $a2, $f0                            # $a2 <-- $f0
             mul     $a2, $a2, 1000                      # $a2 = static_cast<int>(best_bunny_dist)*1000
-            add     $a2, $a2, 10000                     # Add an arbitrary offset to take computation time into account
+            add     $a2, $a2, 1000                      # Add an arbitrary offset to take computation time into account
             jal     MoveWithTime                        # MoveWithTime(best_bunny->x, best_bunny->y, static_cast<int>(best_bunny_dist)*1000); | Asynchronous Move
 
             la      $t0, fsm_state                      # $t0 = &fsm_state
@@ -966,6 +967,9 @@
         and     $a0 $k0 REQUEST_PUZZLE_INT_MASK
         bne     $a0 0 request_puzzle_interrupt
 
+        and     $a0 $k0 PLAYPEN_UNLOCK_INT_MASK
+        bne     $a0 0 playpen_unlock_interrupt
+
         li      $v0, PRINT_STRING           # Unhandled interrupt types
         la      $a0, unhandled_str
         syscall
@@ -1003,6 +1007,11 @@
 
         li	    $t0, 1
         sb	    $t0, puzzle_received        # Set the puzzle request interrupt flag to 1    
+        
+        j       interrupt_dispatch          # see if other interrupts are waiting
+
+    playpen_unlock_interrupt:
+        sw      $0, PLAYPEN_UNLOCK_ACK      # Acknowledge the puzzle request interrupt   
         
         j       interrupt_dispatch          # see if other interrupts are waiting
 
