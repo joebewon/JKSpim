@@ -78,23 +78,48 @@ solvePuzzle:
     jr  $ra                                 # return got_sol && correct;
 
 #########################################
+zero_board:
+    li      $t0, 0              # row = 0
 
+row_loop:
+    bge     $t0, $a0, zero_done      # if row >= num_rows, exit
+    li      $t1, 0              # col = 0
+
+col_loop:
+    bge     $t1, $a1, next_row_zero  # if col >= num_cols, next row
+
+    # Calculate index: row * num_cols + col
+    mul     $t2, $t0, $a1       # t2 = row * num_cols
+    add     $t2, $t2, $t1       # t2 = row * num_cols + col
+    add     $t3, $a2, $t2       # t3 = &solution[row * num_cols + col]
+    sb      $zero, 0($t3)       # solution[index] = 0
+
+    addi    $t1, $t1, 1         # col++
+    j       col_loop
+
+next_row_zero:
+    addi    $t0, $t0, 1         # row++
+    j       row_loop
+
+zero_done:
+    jr      $ra
+#########################################
 board_done_given:
     li      $t0, 0
 
 row_loop_board_done_given:
-    bge     $t0, $a0, all_zero
+    bge     $t0, $a0, all_zero_given
     li      $t1, 0
 
 col_loop_board_done_given:
-    bge     $t1, $a1, next_row
+    bge     $t1, $a1, next_row_given
 
     mul     $t2, $t0, $a1
     add     $t2, $t2, $t1
     add     $t3, $a2, $t2
 
     lbu     $t4, 0($t3)
-    bne     $t4, $0, found_nonzero
+    bne     $t4, $0, found_nonzero_given
 
     addi    $t1, $t1, 1
     j       col_loop_board_done_given

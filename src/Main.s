@@ -73,7 +73,7 @@ main:
         sw      $t2, 0($t4)                                     # playpen_y = _playpen_y;
 
         # Save the enemy playpen location to memory
-        lw      $t0, OTHER_PLAYPEN_LOCATION                     # $t0 = &OTHER_PLAYPEN_LOCATION
+        lw      $t0, PLAYPEN_OTHER_LOCATION                     # $t0 = &PLAYPEN_OTHER_LOCATION
         and     $t5, $t0, 0xFFFF0000                            # $t5 = $t0 & 0xFFFF0000
         srl     $t5, $t5, 16                                    # <$t5> int _other_playpen_x = $t1 >> 16;
         and     $t6, $t0, 0x0000FFFF                            # <$t6> int _other_playpen_y = $t0 & 0x0000FFFF;

@@ -63,7 +63,8 @@ bonk_interrupt:
     la      $t0, has_timer              # $t0 = &has_timer
     sb      $0, 0($t0)                  # has_timer = false; | Ignore the next timer interrupt to prevent double FSM transitioning
 
-    jal     FSMTransitionFunction       # Call delta
+    la      $t0, FSMTransitionFunction  # $t0 = &FSMTransitionFunction
+    jalr    $t0                         # Call delta
 
     j       interrupt_dispatch          # see if other interrupts are waiting
 
@@ -76,7 +77,9 @@ timer_interrupt:
     beq     $t1, 0, interrupt_dispatch  # Shortcircuit if we are supposed to ignore this interrupt
 
     sb      $0, 0($t0)                  # has_timer = 0;
-    jal     FSMTransitionFunction       # Call delta
+
+    la      $t0, FSMTransitionFunction  # $t0 = &FSMTransitionFunction
+    jalr    $t0                         # Call delta
 
     j       interrupt_dispatch          # see if other interrupts are waiting
 
