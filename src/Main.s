@@ -51,37 +51,9 @@ MMIO_STATUS             = 0xffff204c
 
 ############################ Don't Link the above ############################
 
-.data
-.align 4
-bunnies_info: .space 484                                        # Space for the BunniesInfo Struct
-
-puzzle: .space 268                                              # Space for the LightsOut Puzzle
-
-solution: .space 256                                            # Space for the solution to the LightsOut Puzzle
-
-num_puzzles_requested: .word 0                                  # The number of puzzles that have been requested
-
-timestamp_can_unlock_enemy: .word 0                             # The timestamp, in cycles, of when we can next unlock the enemy's playpen
-
-time_between_playpens: .word 0                                  # The number of cycles it would take to travel between the two playpens
-
-playpen_x: .word 0                                              # The x-cooridnate of our playpen
-playpen_y: .word 0                                              # The y-cooridnate of our playpen
-other_playpen_x: .word 0                                        # The x-cooridnate of their playpen
-other_playpen_y: .word 0                                        # The y-cooridnate of their playpen
-
-.align 1
-has_bonked: .byte 0                                             # Bonk Interrupt
-
-puzzle_received: .byte 0                                        # Puzzle Received Interrupt
-
-has_timer: .byte 0                                              # Whether or not we should actually respect the timer interrupt
-
-fsm_state: .byte 0                                              # Current state of the FSM
-
 .text
 main:
-        #################### #################### Enable Interrupts #################### ####################
+        #################### Enable Interrupts ####################
         li      $t4, 1
         or      $t4, $t4, TIMER_INT_MASK
         or      $t4, $t4, BONK_INT_MASK                         # enable bonk interrupt
@@ -89,7 +61,7 @@ main:
         or      $t4, $t4, 1                                     # global enable
         mtc0    $t4, $12
 
-        #################### #################### Preprocessing #################### ####################
+        #################### Preprocessing ####################
         # Save the playpen location to memory
         lw      $t0, PLAYPEN_LOCATION                           # $t0 = &PLAYPEN_LOCATION
         and     $t1, $t0, 0xFFFF0000                            # $t1 = $t0 & 0xFFFF0000
@@ -128,10 +100,10 @@ main:
         la      $t0, time_between_playpens                      # $t0 = &time_between_playpens
         sw      $t5, 0($t0)                                     # time_between_playpens = _time_between_playpens;
 
-        #################### #################### Start Schmoovin' #################### ####################
+        #################### Start Schmoovin' ####################
         jal     FSMTransitionFunction                           # Lets get ts on the road!
 
-#################### #################### Tell 'em to bring out the whole ocean! #################### ####################
+#################### Tell 'em to bring out the whole ocean! ####################
 loop:
         jal     SolvePuzzle                                     # Infinitely Solve Puzzles: Bands on Bands on Bands.
         j       loop                                            # MORE!!!!
@@ -139,4 +111,33 @@ loop:
 # import Kernel.s
 # import FSMTransitionFunction.s
 # import Solve.s
+# import DataSegment.s
+.data
+.align 4
+bunnies_info: .space 484                                        # Space for the BunniesInfo Struct
+
+puzzle: .space 268                                              # Space for the LightsOut Puzzle
+
+solution: .space 256                                            # Space for the solution to the LightsOut Puzzle
+
+num_puzzles_requested: .word 0                                  # The number of puzzles that have been requested
+
+timestamp_can_unlock_enemy: .word 0                             # The timestamp, in cycles, of when we can next unlock the enemy's playpen
+
+time_between_playpens: .word 0                                  # The number of cycles it would take to travel between the two playpens
+
+playpen_x: .word 0                                              # The x-cooridnate of our playpen
+playpen_y: .word 0                                              # The y-cooridnate of our playpen
+other_playpen_x: .word 0                                        # The x-cooridnate of their playpen
+other_playpen_y: .word 0                                        # The y-cooridnate of their playpen
+
+.align 1
+has_bonked: .byte 0                                             # Bonk Interrupt
+
+puzzle_received: .byte 0                                        # Puzzle Received Interrupt
+
+has_timer: .byte 0                                              # Whether or not we should actually respect the timer interrupt
+
+fsm_state: .byte 0                                              # Current state of the FSM
+
 # import Arctan2lookup.s

@@ -115,7 +115,7 @@ done:
     lw      $ra, 40($k0)
 
 .set noat
-    move    $at, $k1        # Restore $at
+    move    $at, $k1                    # Restore $at
 .set at
     eret
 

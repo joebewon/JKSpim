@@ -66,14 +66,14 @@ fsm_state: .byte 0                                  # Current state of the FSM
 #
 # Transition Function for the FSM. Changes the FSM state and also does the proper action tied with the state.
 #
-# @UsedTemporaries: $t0, $t1
+# @UsedTemporaries: $t0, $t1, $t2
 #
 # @Params: None
 #
 # @Returns: void
 FSMTransitionFunction:
     sub     $sp, $sp, 4                             # Allocate 4 bytes on the stack
-    sw      $ra, 0($ra)                             # Save $ra to the stack
+    sw      $ra, 0($sp)                             # Save $ra to the stack
 
     la      $t0, fsm_state                          # $t0 = &fsm_state
     lb		$t1, 0($t0)                             # Load the FSM State
@@ -89,19 +89,19 @@ FSMTransitionFunction:
 
         lw      $a0, 0($v0)                         # $a0 = best_bunny->x
         lw      $a1, 4($v0)                         # $a1 = best_bunny->y
-        # cvt.w.s $f0, $f0                            # $f0 = static_cast<int>(best_bunny_dist)
-        # mfc1    $a2, $f0                            # $a2 <-- $f0
-        # mul     $a2, $a2, 1000                      # $a2 = static_cast<int>(best_bunny_dist)*1000
-        # add     $a2, $a2, 10000                     # Add an arbitrary offset to take computation time into account
-        jal     Move                                # Move(); | Asynchronous Move
+        cvt.w.s $f0, $f0                            # $f0 = static_cast<int>(best_bunny_dist)
+        mfc1    $a2, $f0                            # $a2 <-- $f0
+        mul     $a2, $a2, 1000                      # $a2 = static_cast<int>(best_bunny_dist)*1000
+        add     $a2, $a2, 10000                     # Add an arbitrary offset to take computation time into account
+        jal     MoveWithTime                        # MoveWithTime(best_bunny->x, best_bunny->y, static_cast<int>(best_bunny_dist)*1000); | Asynchronous Move
 
         la      $t0, fsm_state                      # $t0 = &fsm_state
         li      $t1, 1                              # $t1 = 1
         sb      $t1, 0($t0)                         # fsm_state = 1;
         j       FSM_Return                          # return;
     FSM_1:
-        sw      $0, CATCH_BUNNY($0)
-        lw      $t0, MMIO_STATUS($0)
+        sw      $0, CATCH_BUNNY
+        lw      $t0, MMIO_STATUS
 
         beq     $t0, 0, FSM_1_Bunny_Picked          # if bunny was picked up, jump to FSM_1_Bunny_Picked
         la      $t0, fsm_state                      # $t0 = &fsm_state
@@ -109,30 +109,30 @@ FSMTransitionFunction:
         j       FSM_0                               # Pick a new bunny until you actually succesfully pick one up
 
         FSM_1_Bunny_Picked:
-            la      $t0, playpen_x($0)              # $t0 = &other_playpen_x
+            la      $t0, playpen_x                  # $t0 = &playpen_x
             lw      $a0, 0($t0)                     # $a0 = playpen_x | Extract x coordinate
-            and     $a1, 4($t0)                     # $a0 = playpen_y | Extract shifted y coordinate
-            jal     Move                            # Move(); | Asynchronous Move
+            lw      $a1, 4($t0)                     # $a0 = playpen_y | Extract shifted y coordinate
+            jal     Move                            # Move(playpen_x, playpen_y); | Asynchronous Move
             
             la      $t0, fsm_state                  # $t0 = &fsm_state
             li      $t1, 2                          # $t1 = 2
             sb      $t1, 0($t0)                     # fsm_state = 2;
             j       FSM_Return                      # return;
     FSM_2:
-        sw      $0, LOCK_PLAYPEN($0)                # Lock the playpen
-        lw      $t0, NUM_BUNNIES_CARRIED($0)        # $t0 = *NUM_BUNNIES_CARRIED
-        sw      $t0, PUT_BUNNIES_IN_PLAYPEN($0)     # Put all of the bunnies in our playpen
+        sw      $0, LOCK_PLAYPEN                    # Lock the playpen
+        lw      $t0, NUM_BUNNIES_CARRIED            # $t0 = *NUM_BUNNIES_CARRIED
+        sw      $t0, PUT_BUNNIES_IN_PLAYPEN         # Put all of the bunnies in our playpen
 
         # Since we can only unlock their playpen once every 100,000 cycles,
         #   we can save the timestamp of when we last unlocked their pen
         #   and only move to their playpen and state 3 iff the current timestamp is
         #   more than 100,000 cycles after the saved timestamp, then save the current timestamp to do the same later.
 
-        la      $t0, timestamp_unlocked_enemy       # $t0 = &timestamp_can_unlock_enemy
+        la      $t0, timestamp_can_unlock_enemy     # $t0 = &timestamp_can_unlock_enemy
         lw      $t0, 0($t0)                         # $t0 = timestamp_can_unlock_enemy
         la      $t1, time_between_playpens          # $t1 = &time_between_playpens   
         lw      $t1, 0($t1)                         # $t1 = time_between_playpens
-        lw      $t2, TIMER($0)                      # $t2 = *timer
+        lw      $t2, TIMER($0)                      # <$t2> int current_time = *timer
 
         add     $t2, $t2, $t1                       # $t2 = current_time + time_between_playpens | the timestamp when we would reach the enemy playpen
         bgt     $t2, $t0, FSM_2_Sabotage            # if current_time + time_between_playpens > timestamp_can_unlock_enemy, jump to FSM_2_Sabotage
@@ -142,19 +142,19 @@ FSMTransitionFunction:
         j       FSM_0                               # Immediatly look for another bunny as we can't unlock their playpen anyway
 
         FSM_2_Sabotage:
-            la      $t0, other_playpen_x($0)        # $t0 = &other_playpen_x
+            la      $t0, other_playpen_x            # $t0 = &other_playpen_x
             lw      $a0, 0($t0)                     # $a0 = other_playpen_x | Extract x coordinate
-            and     $a1, 4($t0)                     # $a1 = other_playpen_y | Extract shifted y coordinate
-            jal     Move                            # Move(); | Asynchronous Move
+            lw      $a1, 4($t0)                     # $a1 = other_playpen_y | Extract shifted y coordinate
+            jal     Move                            # Move(other_playpen_x, other_playpen_y); | Asynchronous Move
         
             la      $t0, fsm_state                  # $t0 = &fsm_state
             li      $t1, 3                          # $t1 = 3
             sb      $t1, 0($t0)                     # fsm_state = 3;
             j       FSM_Return                      # return;
     FSM_3:
-        lw      $t0, UNLOCK_PLAYPEN($0)             # Unlock Opponent's Playpen
+        sw      $0, UNLOCK_PLAYPEN                  # Unlock Opponent's Playpen
         lw      $t1, TIMER($0)                      # $t1 = *timer
-        lw      $t2, MMIO_STATUS                    # $t1 = *MMIO_STATUS
+        lw      $t2, MMIO_STATUS                    # $t2 = *MMIO_STATUS
 
         beq     $t2, 1, FSM_3_Continue              # if the unlock failed, jump to FSM_3_Continue and don't update timestamp_can_unlock_enemy
         la      $t0, timestamp_can_unlock_enemy     # $t0 = &timestamp_can_unlock_enemy

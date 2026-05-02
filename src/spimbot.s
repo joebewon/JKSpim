@@ -50,38 +50,10 @@ PLAYPEN_UNLOCK_ACK      = 0xffff0028  ## Playpen Unlock
 
 MMIO_STATUS             = 0xffff204c
 
-# import Main.s
-.data
-.align 4
-bunnies_info: .space 484                                        # Space for the BunniesInfo Struct
-
-puzzle: .space 268                                              # Space for the LightsOut Puzzle
-
-solution: .space 256                                            # Space for the solution to the LightsOut Puzzle
-
-num_puzzles_requested: .word 0                                  # The number of puzzles that have been requested
-
-timestamp_can_unlock_enemy: .word 0                             # The timestamp, in cycles, of when we can next unlock the enemy's playpen
-
-time_between_playpens: .word 0                                  # The number of cycles it would take to travel between the two playpens
-
-playpen_x: .word 0                                              # The x-cooridnate of our playpen
-playpen_y: .word 0                                              # The y-cooridnate of our playpen
-other_playpen_x: .word 0                                        # The x-cooridnate of their playpen
-other_playpen_y: .word 0                                        # The y-cooridnate of their playpen
-
-.align 1
-has_bonked: .byte 0                                             # Bonk Interrupt
-
-puzzle_received: .byte 0                                        # Puzzle Received Interrupt
-
-has_timer: .byte 0                                              # Whether or not we should actually respect the timer interrupt
-
-fsm_state: .byte 0                                              # Current state of the FSM
-
+################## ################## import Main.s ################## ##################
 .text
 main:
-        #################### #################### Enable Interrupts #################### ####################
+        #################### Enable Interrupts ####################
         li      $t4, 1
         or      $t4, $t4, TIMER_INT_MASK
         or      $t4, $t4, BONK_INT_MASK                         # enable bonk interrupt
@@ -89,7 +61,7 @@ main:
         or      $t4, $t4, 1                                     # global enable
         mtc0    $t4, $12
 
-        #################### #################### Preprocessing #################### ####################
+        #################### Preprocessing ####################
         # Save the playpen location to memory
         lw      $t0, PLAYPEN_LOCATION                           # $t0 = &PLAYPEN_LOCATION
         and     $t1, $t0, 0xFFFF0000                            # $t1 = $t0 & 0xFFFF0000
@@ -128,15 +100,129 @@ main:
         la      $t0, time_between_playpens                      # $t0 = &time_between_playpens
         sw      $t5, 0($t0)                                     # time_between_playpens = _time_between_playpens;
 
-        #################### #################### Start Schmoovin' #################### ####################
+        #################### Start Schmoovin' ####################
         jal     FSMTransitionFunction                           # Lets get ts on the road!
 
-#################### #################### Tell 'em to bring out the whole ocean! #################### ####################
+#################### Tell 'em to bring out the whole ocean! ####################
 loop:
         jal     SolvePuzzle                                     # Infinitely Solve Puzzles: Bands on Bands on Bands.
         j       loop                                            # MORE!!!!
 
-# import Kernel.s
+################## ################## import FSMTransitionFunction.s ################## ##################
+# @function
+#
+# Transition Function for the FSM. Changes the FSM state and also does the proper action tied with the state.
+#
+# @UsedTemporaries: $t0, $t1, $t2
+#
+# @Params: None
+#
+# @Returns: void
+FSMTransitionFunction:
+    sub     $sp, $sp, 4                             # Allocate 4 bytes on the stack
+    sw      $ra, 0($sp)                             # Save $ra to the stack
+
+    la      $t0, fsm_state                          # $t0 = &fsm_state
+    lb		$t1, 0($t0)                             # Load the FSM State
+
+    # Branch for each FSM State
+    beq     $t1, 0, FSM_0                           # if fsm_state == 0, go to FSM_0
+    beq     $t1, 1, FSM_1                           # if fsm_state == 1, go to FSM_1
+    beq     $t1, 2, FSM_2                           # if fsm_state == 2, go to FSM_2
+    beq     $t1, 3, FSM_3                           # if fsm_state == 3, go to FSM_3
+
+    FSM_0:
+        jal     PickBestBunny                       # (Bunny* best_bunny, float best_bunny_dist) = PickBestBunny()
+
+        lw      $a0, 0($v0)                         # $a0 = best_bunny->x
+        lw      $a1, 4($v0)                         # $a1 = best_bunny->y
+        cvt.w.s $f0, $f0                            # $f0 = static_cast<int>(best_bunny_dist)
+        mfc1    $a2, $f0                            # $a2 <-- $f0
+        mul     $a2, $a2, 1000                      # $a2 = static_cast<int>(best_bunny_dist)*1000
+        add     $a2, $a2, 10000                     # Add an arbitrary offset to take computation time into account
+        jal     MoveWithTime                        # MoveWithTime(best_bunny->x, best_bunny->y, static_cast<int>(best_bunny_dist)*1000); | Asynchronous Move
+
+        la      $t0, fsm_state                      # $t0 = &fsm_state
+        li      $t1, 1                              # $t1 = 1
+        sb      $t1, 0($t0)                         # fsm_state = 1;
+        j       FSM_Return                          # return;
+    FSM_1:
+        sw      $0, CATCH_BUNNY
+        lw      $t0, MMIO_STATUS
+
+        beq     $t0, 0, FSM_1_Bunny_Picked          # if bunny was picked up, jump to FSM_1_Bunny_Picked
+        la      $t0, fsm_state                      # $t0 = &fsm_state
+        sb      $0, 0($t0)                          # fsm_state = 0;
+        j       FSM_0                               # Pick a new bunny until you actually succesfully pick one up
+
+        FSM_1_Bunny_Picked:
+            la      $t0, playpen_x                  # $t0 = &playpen_x
+            lw      $a0, 0($t0)                     # $a0 = playpen_x | Extract x coordinate
+            lw      $a1, 4($t0)                     # $a0 = playpen_y | Extract shifted y coordinate
+            jal     Move                            # Move(playpen_x, playpen_y); | Asynchronous Move
+            
+            la      $t0, fsm_state                  # $t0 = &fsm_state
+            li      $t1, 2                          # $t1 = 2
+            sb      $t1, 0($t0)                     # fsm_state = 2;
+            j       FSM_Return                      # return;
+    FSM_2:
+        sw      $0, LOCK_PLAYPEN                    # Lock the playpen
+        lw      $t0, NUM_BUNNIES_CARRIED            # $t0 = *NUM_BUNNIES_CARRIED
+        sw      $t0, PUT_BUNNIES_IN_PLAYPEN         # Put all of the bunnies in our playpen
+
+        # Since we can only unlock their playpen once every 100,000 cycles,
+        #   we can save the timestamp of when we last unlocked their pen
+        #   and only move to their playpen and state 3 iff the current timestamp is
+        #   more than 100,000 cycles after the saved timestamp, then save the current timestamp to do the same later.
+
+        la      $t0, timestamp_can_unlock_enemy     # $t0 = &timestamp_can_unlock_enemy
+        lw      $t0, 0($t0)                         # $t0 = timestamp_can_unlock_enemy
+        la      $t1, time_between_playpens          # $t1 = &time_between_playpens   
+        lw      $t1, 0($t1)                         # $t1 = time_between_playpens
+        lw      $t2, TIMER($0)                      # <$t2> int current_time = *timer
+
+        add     $t2, $t2, $t1                       # $t2 = current_time + time_between_playpens | the timestamp when we would reach the enemy playpen
+        bgt     $t2, $t0, FSM_2_Sabotage            # if current_time + time_between_playpens > timestamp_can_unlock_enemy, jump to FSM_2_Sabotage
+
+        la      $t0, fsm_state                      # $t0 = &fsm_state
+        sb      $0, 0($t0)                          # fsm_state = 0;
+        j       FSM_0                               # Immediatly look for another bunny as we can't unlock their playpen anyway
+
+        FSM_2_Sabotage:
+            la      $t0, other_playpen_x            # $t0 = &other_playpen_x
+            lw      $a0, 0($t0)                     # $a0 = other_playpen_x | Extract x coordinate
+            lw      $a1, 4($t0)                     # $a1 = other_playpen_y | Extract shifted y coordinate
+            jal     Move                            # Move(other_playpen_x, other_playpen_y); | Asynchronous Move
+        
+            la      $t0, fsm_state                  # $t0 = &fsm_state
+            li      $t1, 3                          # $t1 = 3
+            sb      $t1, 0($t0)                     # fsm_state = 3;
+            j       FSM_Return                      # return;
+    FSM_3:
+        sw      $0, UNLOCK_PLAYPEN                  # Unlock Opponent's Playpen
+        lw      $t1, TIMER($0)                      # $t1 = *timer
+        lw      $t2, MMIO_STATUS                    # $t2 = *MMIO_STATUS
+
+        beq     $t2, 1, FSM_3_Continue              # if the unlock failed, jump to FSM_3_Continue and don't update timestamp_can_unlock_enemy
+        la      $t0, timestamp_can_unlock_enemy     # $t0 = &timestamp_can_unlock_enemy
+        add     $t1, $t1, 100000                    # $t1 = *timer + 100000
+        sw      $t1, 0($t0)                         # timestamp_can_unlock_enemy = *timer + 100000
+        
+        FSM_3_Continue:
+            la      $t0, fsm_state                  # $t0 = &fsm_state
+            sb      $0, 0($t0)                      # fsm_state = 0;
+            j       FSM_0                           # Immediatly look for the next bunny
+
+    FSM_Return:
+        lw      $ra, 0($sp)                         # Load $ra from the stack
+        add		$sp, $sp, 4                         # Deallocate 4 bytes
+        jr      $ra                                 # return;
+        
+# import Move.s;
+# import PickBestBunny.s;
+# import Solve.s
+
+################## ################## import Kernel.s ################## ##################
 # ======================== kernel code ================================
 .kdata
 chunkIH:    .space 44
@@ -250,10 +336,36 @@ done:
     lw      $ra, 40($k0)
 
 .set noat
-    move    $at, $k1        # Restore $at
+    move    $at, $k1                    # Restore $at
 .set at
     eret
 
-# import FSMTransitionFunction.s
-# import Solve.s
+.data
+.align 4
+bunnies_info: .space 484                                        # Space for the BunniesInfo Struct
+
+puzzle: .space 268                                              # Space for the LightsOut Puzzle
+
+solution: .space 256                                            # Space for the solution to the LightsOut Puzzle
+
+num_puzzles_requested: .word 0                                  # The number of puzzles that have been requested
+
+timestamp_can_unlock_enemy: .word 0                             # The timestamp, in cycles, of when we can next unlock the enemy's playpen
+
+time_between_playpens: .word 0                                  # The number of cycles it would take to travel between the two playpens
+
+playpen_x: .word 0                                              # The x-cooridnate of our playpen
+playpen_y: .word 0                                              # The y-cooridnate of our playpen
+other_playpen_x: .word 0                                        # The x-cooridnate of their playpen
+other_playpen_y: .word 0                                        # The y-cooridnate of their playpen
+
+.align 1
+has_bonked: .byte 0                                             # Bonk Interrupt
+
+puzzle_received: .byte 0                                        # Puzzle Received Interrupt
+
+has_timer: .byte 0                                              # Whether or not we should actually respect the timer interrupt
+
+fsm_state: .byte 0                                              # Current state of the FSM
+
 # import Arctan2lookup.s
