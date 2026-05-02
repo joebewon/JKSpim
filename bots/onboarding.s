@@ -59,8 +59,25 @@ main:
 
     # YOUR CODE GOES HERE!!!!!!
 
+    li $t0, 10
+    sw $t0, VELOCITY
 
+    li $t1, 90
+    sw $t1, ANGLE
 
+    li $t2, 1
+    sw $t2, ANGLE_CONTROL
+
+    lw $t3, TIMER   # current_time = *TIMER
+    add $t3, $t3, 20000   # time_to_stop = current_time + 20000
+    sw $t3, TIMER  # *TIMER = time_to_stop
+
+    wait:
+        lb $t4, has_timer
+        beq $t4, $0, wait # wait as long as has_timer == 0
+    
+    sb $0, has_timer  # has_timer = 0
+    sw $0, VELOCITY  # *VELOCITY = 0, stop moving bot
 
     # END YOUR CODE SECTION 
 
