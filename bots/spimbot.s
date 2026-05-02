@@ -51,18 +51,19 @@ MMIO_STATUS             = 0xffff204c
 
 
 .data
-puzzle_received: .word 0
-timer_received: .word 0
-bunnies: .space 484 # allocate
-.align 2 # to make sure that the next item starts at address div by 4 (may want to add this in other places)
-puzzle_data: .space 300
-.align 2
-puzzle_sol: .space 256
-puzzle_num: .word 0
+.align 4
+bunnies_info: .space 484                    # Space for the BunniesInfo Struct
 
-# If you want, you can use the following to detect if a bonk has happened.
-has_bonked: .byte 0
-.align 2 # to make sure that the next item starts at address div by 4 (may want to add this in other places)
+puzzle: .space 268                          # Space for the LightsOut Puzzle
+
+solution: .space 256                        # Space for the solution to the LightsOut Puzzle
+
+num_puzzles_requested: .word 0              # The number of puzzle that habve been requested
+
+.align 1
+has_bonked: .byte 0                         # Bonk Interrupt
+
+puzzle_received: .byte 0                    # Puzzle Received Interrupt
 
 .text
 main:
@@ -79,12 +80,12 @@ main:
         or      $t4,    $t4,    1 # global enable
         mtc0    $t4     $12
 
-        li $t1, 0
-        sw $t1, ANGLE
-        li $t1, 1
-        sw $t1, ANGLE_CONTROL
-        li $t2, 0
-        sw $t2, VELOCITY
+        # li $t1, 0
+        # sw $t1, ANGLE
+        # li $t1, 1
+        # sw $t1, ANGLE_CONTROL
+        # li $t2, 0
+        # sw $t2, VELOCITY
 
         # YOUR CODE GOES HERE!!!!!!
 
@@ -404,6 +405,7 @@ print_xy:
   
   jr	$ra
 
+#########################################
 zero_board:
     li      $t0, 0              # row = 0
 
@@ -431,7 +433,6 @@ zero_done:
     jr      $ra
 
 #########################################
-
 board_done:
     li      $t0, 0
 
