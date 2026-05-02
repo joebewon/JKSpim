@@ -53,86 +53,88 @@ MMIO_STATUS             = 0xffff204c
 
 .data
 .align 4
-bunnies_info: .space 484                            # Space for the BunniesInfo Struct
+bunnies_info: .space 484                                        # Space for the BunniesInfo Struct
 
-puzzle: .space 268                                  # Space for the LightsOut Puzzle
+puzzle: .space 268                                              # Space for the LightsOut Puzzle
 
-solution: .space 256                                # Space for the solution to the LightsOut Puzzle
+solution: .space 256                                            # Space for the solution to the LightsOut Puzzle
 
-num_puzzles_requested: .word 0                      # The number of puzzles that have been requested
+num_puzzles_requested: .word 0                                  # The number of puzzles that have been requested
 
-timestamp_can_unlock_enemy: .word 0                 # The timestamp, in cycles, of when we can next unlock the enemy's playpen
+timestamp_can_unlock_enemy: .word 0                             # The timestamp, in cycles, of when we can next unlock the enemy's playpen
 
-time_between_playpens: .word 0                      # The number of cycles it would take to travel between the two playpens
+time_between_playpens: .word 0                                  # The number of cycles it would take to travel between the two playpens
 
-playpen_x: .word 0                                  # The x-cooridnate of our playpen
-playpen_y: .word 0                                  # The y-cooridnate of our playpen
-other_playpen_x: .word 0                            # The x-cooridnate of their playpen
-other_playpen_y: .word 0                            # The y-cooridnate of their playpen
+playpen_x: .word 0                                              # The x-cooridnate of our playpen
+playpen_y: .word 0                                              # The y-cooridnate of our playpen
+other_playpen_x: .word 0                                        # The x-cooridnate of their playpen
+other_playpen_y: .word 0                                        # The y-cooridnate of their playpen
 
 .align 1
-has_bonked: .byte 0                                 # Bonk Interrupt
+has_bonked: .byte 0                                             # Bonk Interrupt
 
-puzzle_received: .byte 0                            # Puzzle Received Interrupt
+puzzle_received: .byte 0                                        # Puzzle Received Interrupt
 
-has_timer: .byte 0                                  # Whether or not we should actually respect the timer interrupt
+has_timer: .byte 0                                              # Whether or not we should actually respect the timer interrupt
 
-fsm_state: .byte 0                                  # Current state of the FSM
+fsm_state: .byte 0                                              # Current state of the FSM
 
 .text
 main:
-        # enable interrupts
-        li      $t4,    1
-        or      $t4,    $t4,    TIMER_INT_MASK
-        or      $t4,    $t4,    BONK_INT_MASK             # enable bonk interrupt
-        or      $t4,    $t4,    REQUEST_PUZZLE_INT_MASK   # enable puzzle interrupt
-        or      $t4,    $t4,    1 # global enable
-        mtc0    $t4,    $12
+        #################### #################### Enable Interrupts #################### ####################
+        li      $t4, 1
+        or      $t4, $t4, TIMER_INT_MASK
+        or      $t4, $t4, BONK_INT_MASK                         # enable bonk interrupt
+        or      $t4, $t4, REQUEST_PUZZLE_INT_MASK               # enable puzzle interrupt
+        or      $t4, $t4, 1                                     # global enable
+        mtc0    $t4, $12
 
+        #################### #################### Preprocessing #################### ####################
         # Save the playpen location to memory
-        lw $t0, PLAYPEN_LOCATION
-        and $t1, $t0, 0xFFFF0000
-        srl $t1, $t1, 26    
-        and $t2, $t0, 0x0000FFFF
-        la $t3, playpen_x
-        sw $t1, 0($t3)
-        la $t4, playpen_y
-        sw $t2, 0($t4)
+        lw      $t0, PLAYPEN_LOCATION                           # $t0 = &PLAYPEN_LOCATION
+        and     $t1, $t0, 0xFFFF0000                            # $t1 = $t0 & 0xFFFF0000
+        srl     $t1, $t1, 16                                    # <$t6> int _playpen_x = $t1 >> 16;
+        and     $t2, $t0, 0x0000FFFF                            # <$t2> int _playpen_y = $t0 & 0x0000FFFF;
+        la      $t3, playpen_x                                  # $t3 = &playpen_x
+        sw      $t1, 0($t3)                                     # playpen_x = _playpen_x;
+        la      $t4, playpen_y                                  # $t4 = &playpen_y
+        sw      $t2, 0($t4)                                     # playpen_y = _playpen_y;
 
         # Save the enemy playpen location to memory
-        lw $t0, OTHER_PLAYPEN_LOCATION
-        and $t5, $t0, 0xFFFF0000
-        srl $t5, $t5, 26    
-        and $t6, $t0, 0x0000FFFF
-        la $t3, other_playpen_x
-        sw $t5, 0($t3)
-        la $t4, other_playpen_y
-        sw $t6, 0($t4)
+        lw      $t0, OTHER_PLAYPEN_LOCATION                     # $t0 = &OTHER_PLAYPEN_LOCATION
+        and     $t5, $t0, 0xFFFF0000                            # $t5 = $t0 & 0xFFFF0000
+        srl     $t5, $t5, 16                                    # <$t5> int _other_playpen_x = $t1 >> 16;
+        and     $t6, $t0, 0x0000FFFF                            # <$t6> int _other_playpen_y = $t0 & 0x0000FFFF;
+        la      $t3, other_playpen_x                            # $t3 = &other_playpen_x
+        sw      $t5, 0($t3)                                     # other_playpen_x = _other_playpen_x;
+        la      $t4, other_playpen_y                            # $t4 = &other_playpen_y
+        sw      $t6, 0($t4)                                     # other_playpen_y = _other_playpen_y;
 
         # Calculate time_between_playpens
-        sub     $t5, $t5, $t1
-        sub     $t6, $t6, $t2
-        mul     $t5, $t5, $t5
-        mul     $t6, $t6, $t6
-        add     $t5, $t6, $t5
-        mtc1    $t5, $f2
-        cvt.s.w $f2, $f2
-        sqrt.s  $f2, $f2
-        li      $t6, 1000
-        mtc1    $t6, $f3
-        cvt.s.w $f3, $f3
-        mul.s   $f2, $f2, $f3
-        cvt.w.s $f2, $f2
-        mfc1    $t5, $f2
-        la      $t0, time_between_playpens
-        sw      $t5, 0($t0)
+        sub     $t5, $t5, $t1                                   # <$t5> int deltaX = _other_playpen_x - _playpen_x;
+        sub     $t6, $t6, $t2                                   # <$t6> int deltaY = _other_playpen_Y - _playpen_Y;
+        mul     $t5, $t5, $t5                                   # <$t5> int deltaX_2 = deltaX * deltaX;
+        mul     $t6, $t6, $t6                                   # <$t6> int deltaY_2 = deltaY * deltaY;
+        add     $t5, $t6, $t5                                   # <$t5> int squared_sum = deltaX_2 + deltaY_2;
+        mtc1    $t5, $f2                                        # $f2 <-- squared_sum
+        cvt.s.w $f2, $f2                                        # $f2 = static_cast<float>(squared_sum)
+        sqrt.s  $f2, $f2                                        # $f2 = sqrt(squared_sum)
+        li      $t6, 1000                                       # $t6 = 1000
+        mtc1    $t6, $f3                                        # $f3 <-- 1000
+        cvt.s.w $f3, $f3                                        # $f3 = static_cast<float>(1000)
+        mul.s   $f2, $f2, $f3                                   # float _ftime_between_playpens = 1000.0 * sqrt((_other_playpen_x - _playpen_x)**2 + (_other_playpen_Y - _playpen_Y)**2)
+        cvt.w.s $f2, $f2                                        # $f2 = static_cast<int>(_ftime_between_playpens)
+        mfc1    $t5, $f2                                        # <$t5> int _time_between_playpens = static_cast<int>(_ftime_between_playpens);
+        la      $t0, time_between_playpens                      # $t0 = &time_between_playpens
+        sw      $t5, 0($t0)                                     # time_between_playpens = _time_between_playpens;
 
-        jal     FSMTransitionFunction
+        #################### #################### Start Schmoovin' #################### ####################
+        jal     FSMTransitionFunction                           # Lets get ts on the road!
 
-# Once done, enter an infinite loop so that your bot can be graded by QtSpimbot once 10,000,000 cycles have elapsed
+#################### #################### Tell 'em to bring out the whole ocean! #################### ####################
 loop:
-        jal     SolvePuzzle                                 # Infinitely Solve Puzzles. Bands on Bands on Bands.
-        j       loop
+        jal     SolvePuzzle                                     # Infinitely Solve Puzzles: Bands on Bands on Bands.
+        j       loop                                            # MORE!!!!
 
 # import Kernel.s
 # import FSMTransitionFunction.s
