@@ -72,9 +72,10 @@ timer_interrupt:
     sw      $0, VELOCITY                # Set the velocity to 0
 
     la      $t0, has_timer              # $t0 = &has_timer
-    lb		$t0, 0($t0)                 # $t0 = has_timer
-    beq     $t0, 0, interrupt_dispatch  # Shortcircuit if we are supposed to ignore this interrupt
+    lb		$t1, 0($t0)                 # $t1 = has_timer
+    beq     $t1, 0, interrupt_dispatch  # Shortcircuit if we are supposed to ignore this interrupt
 
+    sb      $0, 0($t0)                  # has_timer = 0;
     jal     FSMTransitionFunction       # Call delta
 
     j       interrupt_dispatch          # see if other interrupts are waiting
