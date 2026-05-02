@@ -82,12 +82,12 @@ fsm_state: .byte 0                                  # Current state of the FSM
 .text
 main:
         # enable interrupts
-        li      $t4     1
-        or      $t4     $t4     TIMER_INT_MASK
+        li      $t4,    1
+        or      $t4,    $t4,    TIMER_INT_MASK
         or      $t4,    $t4,    BONK_INT_MASK             # enable bonk interrupt
         or      $t4,    $t4,    REQUEST_PUZZLE_INT_MASK   # enable puzzle interrupt
         or      $t4,    $t4,    1 # global enable
-        mtc0    $t4     $12
+        mtc0    $t4,    $12
 
         # Save the playpen location to memory
         lw $t0, PLAYPEN_LOCATION
@@ -134,7 +134,7 @@ loop:
         jal     SolvePuzzle                                 # Infinitely Solve Puzzles. Bands on Bands on Bands.
         j       loop
 
-# import kernel.s
+# import Kernel.s
 # import FSMTransitionFunction.s
-# import solve.s
-# import arctan2lookup.s
+# import Solve.s
+# import Arctan2lookup.s
