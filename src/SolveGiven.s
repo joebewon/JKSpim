@@ -13,6 +13,8 @@ SolvePuzzle:
     move $a0, $v0
     jal  solvePuzzle
 
+    jr $ra
+
 ########################################
 
 # @function

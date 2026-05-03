@@ -202,8 +202,25 @@ First, we can always transpose the board to have the shorter side as the columns
 
 Second, we can see that when $min(n,m) \gt 11$ and $l = 3$, the lookup tables are so huge, they take up the vast majority of the space, and the board space is so huge, that solving those puzzles will just take to long with any other method. Instead, we can just not store those lookup tables, and just skip those puzzles when we get them, as it will almost surely be better to scrap it and request a smaller one.
 
-### Algorithm
+We can optimize the $l = 2$ case by storing half-words, but we still need the full word for the $l = 3$ case. Since we are transposing, the total amount of memory in bytes we need is described by the following expression:
 
+```math
+m(x,y) = 2\sum_{m=1}^{x}\sum_{n=m}^{16}2^{m} + 4\sum_{m=1}^{y}\sum_{n=m}^{16}3^{m}
+```
+
+Where $x$ and $y$ are the minimum dimensions allowed for the $l = 2$ and $l = 3$ cases respectively.
+
+Since $l = 3$ exploads so much faster than $l = 2$, we can set $x = 16$, and not have any issues.
+
+After some fiddling, we can see two valid options for $y$,
+```math
+m(16, 9) = 1527944 \ \ \text{bytes} \equiv 1.5 \text{MB} \newline
+m(16, 10) = 3181316 \ \ \text{bytes} \equiv 3.2 \text{MB}
+```
+
+We will chose $y = 10$. I.e., if $l = 3$ and $min(n,m) > 10$, we just skip solving the puzzle entirely.
+
+### Algorithm
 From the above observations, we can derive the following algorithms.
 
 #### $l = 2$
@@ -211,7 +228,7 @@ From the above observations, we can derive the following algorithms.
 // This is pseudocode, so the syntax isn't perfect
 // This is not meant to be directly compiled
 
-bool CTLSolve2(LightsOuts* puzzle, unsigned char* board_buff, unsigned char* solution) {
+bool CTLSolve2(LightsOuts* puzzle, unsigned char* solution, unsigned char* board_buff) {
     const int num_rows = puzzle->num_rows;
     const int num_cols = puzzle->num_cols;
     unsigned char* board_ptr = &puzzle->board;
@@ -229,8 +246,8 @@ bool CTLSolve2(LightsOuts* puzzle, unsigned char* board_buff, unsigned char* sol
         for (uint8_t i = 1; i < num_rows; ++i) {
             for (uint8_t j = 0; j < num_cols; ++j) {
                 if (board_ptr[i - 1][j] == 1) {
-                    toggle_light(board_ptr, i, j, 1);
                     solution[i][j] = 1;
+                    toggle_light(board_ptr, i, j, 1);
                 }
             }
         }
@@ -249,8 +266,8 @@ bool CTLSolve2(LightsOuts* puzzle, unsigned char* board_buff, unsigned char* sol
         // Toggle the top row based on the first row enumerate
         for (uint8_t j = 0; j < num_cols; ++j) {
             if (((first_row_enumerate >> j) & 1) == 1) {
-                toggle_light(board_ptr, 0, j, 1);
                 solution[0][j] = 1 - solution[0][j];
+                toggle_light(board_ptr, 0, j, 1);
             }
         }
 
@@ -259,14 +276,14 @@ bool CTLSolve2(LightsOuts* puzzle, unsigned char* board_buff, unsigned char* sol
          * Remember, our desired endstate is when all lights are 0,
          *      so toggle iff the cell directly above the current cell is 1,
          *      because we need to turn it off.
-         * Remember, we do not run the second pass on the original borad.
+         * Remember, we do not run the second pass on the original board.
          *      I.e., we run on the board we currently have after the first pass.
          */
         for (uint8_t i = 1; i < num_rows; ++i) {
             for (uint8_t j = 0; j < num_cols; ++j) {
                 if (board_ptr[i - 1][j] == 1) {
-                    toggle_light(board_ptr, i, j, 1);
                     solution[i][j] = 1 - solution[i][j];
+                    toggle_light(board_ptr, i, j, 1);
                 }
             }
         }
@@ -293,8 +310,8 @@ bool CTLSolve2(LightsOuts* puzzle, unsigned char* board_buff, unsigned char* sol
         for (uint8_t i = 1; i < num_cols; ++i) {
             for (uint8_t j = 0; j < num_rows; ++j) {
                 if (board_buff[i - 1][j] == 1) {
-                    toggle_light(board_buff, i, j, 1);
                     solution[j][i] = 1; // Remember to reverse the indexing
+                    toggle_light(board_buff, i, j, 1);
                 }
             }
         }
@@ -313,28 +330,182 @@ bool CTLSolve2(LightsOuts* puzzle, unsigned char* board_buff, unsigned char* sol
         // Toggle the top row based on the first row enumerate
         for (uint8_t j = 0; j < num_rows; ++j) {
             if (((first_row_enumerate >> j) & 1) == 1) {
-                toggle_light(board_buff, 0, j, 1);
                 solution[j][0] = 1 - solution[j][0]; // Remember to reverse the indexing
+                toggle_light(board_buff, 0, j, 1);
             }
         }
 
-        /** TODO
+        /**
          * Column major order iteration for the second pass.
          * Remember, our desired endstate is when all lights are 0,
          *      so toggle iff the cell directly above the current cell is 1,
          *      because we need to turn it off.
-         * Remember, we do not run the second pass on the original borad.
+         * Remember, we do not run the second pass on the original board.
          *      I.e., we run on the board we currently have after the first pass.
          */
         for (uint8_t i = 1; i < num_cols; ++i) {
             for (uint8_t j = 0; j < num_rows; ++j) {
                 if (board_buff[i - 1][j] == 1) {
-                    toggle_light(board_buff, i, j, 1);
                     solution[j][i] = 1 - solution[j][i]; // Remember to reverse the indexing
+                    toggle_light(board_buff, i, j, 1);
                 }
             }
         }
 
+        // Because of the way the Lookup Table works, we know we will be solved by this point.
+        return true;        
+    }
+}
+```
+
+#### $l = 3$
+```cpp
+// This is pseudocode, so the syntax isn't perfect
+// This is not meant to be directly compiled
+
+bool CTLSolve3(LightsOuts* puzzle, unsigned char* solution, unsigned char* board_buff) {
+    const int num_rows = puzzle->num_rows;
+    const int num_cols = puzzle->num_cols;
+    unsigned char* board_ptr = &puzzle->board;
+
+    // Board is too big, don't even bother.
+    // Also not storing the lookup table for space efficiency
+    // Likely check before entering the routine.
+    // There is no reason to waste the stack frame in this case
+    if (min(num_rows, num_cols) > 10) return false;
+
+    if (num_cols <= num_rows) {
+        // Zero the solution board
+        zero_board(solution, num_rows, num_cols);
+
+        /**
+         * Row major order iteration for the first pass.
+         * Remember, our desired endstate is when all lights are 0,
+         *      so toggle iff the cell directly above the current cell is not 0,
+         *      because we need to turn it off.
+         */
+        for (uint8_t i = 1; i < num_rows; ++i) {
+            for (uint8_t j = 0; j < num_cols; ++j) {
+                int val = board_ptr[i - 1][j];
+                if (val != 0) {
+                    int action = 3 - val;
+                    solution[i][j] = action;
+                    toggle_light(board_ptr, i, j, action);
+                }
+            }
+        }
+
+        // Shortcirucuit if we just so happen to be done.
+        // It's this check is part of what allows the LUT to be as small as possible
+        if (BoardDone(board_ptr)) return true;
+
+        const int last_row_residual = EncodeResidual3(board_ptr, num_rows, num_cols);
+
+        int first_row_enumerate = CLT_LUT_3[num_rows][num_cols][last_row_residual];
+
+        // Shortcirucuit if the board is unsolvable.
+        if (first_row_enumerate == 0) return false;
+
+        // Toggle the top row based on the first row enumerate
+        for (uint8_t j = 0; j < num_cols; ++j) {
+            int action = ((first_row_enumerate >> (2*j)) & 3);
+            if (action != 0) {
+                solution[0][j] += action;
+                solution[0][j] -= (val >= 3) * 3; // Slick trick, gamer.
+                toggle_light(board_ptr, 0, j, action);
+            }
+        }
+
+        /**
+         * Row major order iteration for the second pass.
+         * Remember, our desired endstate is when all lights are 0,
+         *      so toggle iff the cell directly above the current cell is not 0,
+         *      because we need to turn it off.
+         * Remember, we do not run the second pass on the original board.
+         *      I.e., we run on the board we currently have after the first pass.
+         */
+        for (uint8_t i = 1; i < num_rows; ++i) {
+            for (uint8_t j = 0; j < num_cols; ++j) {
+                int val = board_ptr[i - 1][j];
+                if (val != 0) {
+                    int action = 3 - val;
+                    solution[i][j] += action;
+                    solution[i][j] -= (val >= 3) * 3; // Slick trick, gamer.
+                    toggle_light(board_ptr, i, j, action);
+                }
+            }
+        }
+
+        // Because of the way the Lookup Table works, we know we will be solved by this point.
+        return true;
+    } else {
+        // Remember, all indexing is on the transposed matrix, so it looks identical.
+        // The only difference between this and the previous clause are the bounds,
+        // and that we have to reverse the indexing into solution.
+
+        // Transpose the board with a copy.
+        copy_T(board_ptr, board_buff, num_rows, num_cols);
+
+        // Zero the solution board
+        zero_board(solution, num_rows, num_cols);
+
+        /**
+         * Column major order iteration for the first pass.
+         * Remember, our desired endstate is when all lights are 0,
+         *      so toggle iff the cell directly above the current cell is not 0,
+         *      because we need to turn it off.
+         */
+        for (uint8_t i = 1; i < num_cols; ++i) {
+            for (uint8_t j = 0; j < num_rows; ++j) {
+                int val = board_buff[i - 1][j];
+                if (val != 0) {
+                    int action = 3 - val;
+                    solution[j][i] = action; // Remember to reverse the indexing
+                    toggle_light(bourd_buff, i, j, action);
+                }
+            }
+        }
+
+        // Shortcirucuit if we just so happen to be done.
+        // It's this check is part of what allows the LUT to be as small as possible
+        if (BoardDone(board_buff)) return true;
+
+        const int last_row_residual = EncodeResidual3(board_buff, num_cols, num_rows);
+
+        int first_row_enumerate = CLT_LUT_2[num_cols][num_rows][last_row_residual];
+
+        // Shortcirucuit if the board is unsolvable.
+        if (first_row_enumerate == 0) return false;
+
+        // Toggle the top row based on the first row enumerate
+        for (uint8_t j = 0; j < num_rows; ++j) {
+            int action = ((first_row_enumerate >> (2*j)) & 3);
+            if (action != 0) {
+                solution[j][0] += action; // Remember to reverse the indexing
+                solution[j][0] -= (val >= 3) * 3; // Slick trick, gamer.
+                toggle_light(board_buff, 0, j, action);
+            }
+        }
+
+        /**
+         * Column major order iteration for the second pass.
+         * Remember, our desired endstate is when all lights are 0,
+         *      so toggle iff the cell directly above the current cell is not 0,
+         *      because we need to turn it off.
+         * Remember, we do not run the second pass on the original board.
+         *      I.e., we run on the board we currently have after the first pass.
+         */
+        for (uint8_t i = 1; i < num_cols; ++i) {
+            for (uint8_t j = 0; j < num_rows; ++j) {
+                int val = board_buff[i - 1][j];
+                if (val != 0) {
+                    int action = 3 - val;
+                    solution[j][i] += action; // Remember to reverse the indexing
+                    toggle_light(board_buff, i, j, action);
+                    solution[j][i] -= (val >= 3) * 3; // Slick trick, gamer.
+                }
+            }
+        }
         // Because of the way the Lookup Table works, we know we will be solved by this point.
         return true;        
     }
