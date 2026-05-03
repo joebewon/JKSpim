@@ -204,8 +204,9 @@ Second, we can see that when $min(n,m) \gt 11$ and $l = 3$, the lookup tables ar
 
 ### Algorithm
 
-From the above observations, we can derive the following algorithm:
+From the above observations, we can derive the following algorithms.
 
+#### $l = 2$
 ```cpp
 // This is pseudocode, so the syntax isn't perfect
 // This is not meant to be directly compiled
@@ -217,6 +218,9 @@ bool CTLSolve2(LightsOuts* puzzle, unsigned char* board_buff, unsigned char* sol
     unsigned char* board_ptr = &puzzle->board;
 
     if (num_cols <= num_rows) {
+        // Zero the solution board
+        zero_board(solution, num_rows, num_cols);
+
         /**
          * Row major order iteration for the first pass.
          * Remember, our desired endstate is when all lights are 0,
@@ -242,6 +246,14 @@ bool CTLSolve2(LightsOuts* puzzle, unsigned char* board_buff, unsigned char* sol
         // Shortcirucuit if the board is unsolvable.
         if (first_row_enumerate == 0) return false;
 
+        // Toggle the top row based on the first row enumerate
+        for (uint8_t i = 0; i < num_cols; ++i) {
+            if ((first_row_enumerate >> i) & 1 == 1) {
+                toggle_light(board_ptr, 0, i, 1);
+                solution[0][i] = 1;
+            }
+        }
+
         /**
          * Row major order iteration for the second pass.
          * Remember, our desired endstate is when all lights are 0,
@@ -261,6 +273,69 @@ bool CTLSolve2(LightsOuts* puzzle, unsigned char* board_buff, unsigned char* sol
 
         // Because of the way the Lookup Table works, we know we will be solved by this point.
         return true;
-    } else { ... }
+    } else {
+        // Remember, all indexing is on the transposed matrix, so it looks identical.
+        // The only difference between this and the previous clause are the bounds,
+        // and that we have to reverse the indexing into solution.
+
+        // Transpose the board with a copy.
+        copy_T(board_ptr, board_buff, num_rows, num_cols);
+
+        // Zero the solution board
+        zero_board(solution, num_rows, num_cols);
+
+        /**
+         * Column major order iteration for the first pass.
+         * Remember, our desired endstate is when all lights are 0,
+         *      so toggle iff the cell directly above the current cell is 1,
+         *      because we need to turn it off.
+         */
+        for (uint8_t i = 1; i < num_cols; ++i) {
+            for (uint8_t j = 0; j < num_rows; ++j) {
+                if (board_buff[i - 1][j] == 1) {
+                    toggle_light(board_buff, i, j, 1);
+                    solution[j][i] = 1; // Remember to reverse the indexing
+                }
+            }
+        }
+
+        // Shortcirucuit if we just so happen to be done.
+        if (BoardDone(board_ptr)) return true;
+
+        const int last_row_residual = EncodeResidual2(board_buff, num_cols, num_rows);
+
+        int first_row_enumerate = CLT_LUT_2[num_cols][num_rows][last_row_residual];
+
+        // Shortcirucuit if the board is unsolvable.
+        if (first_row_enumerate == 0) return false;
+
+        // Toggle the top row based on the first row enumerate
+        for (uint8_t i = 0; i < num_rows; ++i) {
+            if ((first_row_enumerate >> i) & 1 == 1) {
+                toggle_light(board_buff, 0, i, 1);
+                solution[i][0] = 1; // Remember to reverse the indexing
+            }
+        }
+
+        /** TODO
+         * Column major order iteration for the second pass.
+         * Remember, our desired endstate is when all lights are 0,
+         *      so toggle iff the cell directly above the current cell is 1,
+         *      because we need to turn it off.
+         * Remember, we do not run the second pass on the original borad.
+         *      I.e., we run on the board we currently have after the first pass.
+         */
+        for (uint8_t i = 1; i < num_cols; ++i) {
+            for (uint8_t j = 0; j < num_rows; ++j) {
+                if (board_buff[i - 1][j] == 1) {
+                    toggle_light(board_buff, i, j, 1);
+                    solution[j][i] = 1; // Remember to reverse the indexing
+                }
+            }
+        }
+
+        // Because of the way the Lookup Table works, we know we will be solved by this point.
+        return true;        
+    }
 }
 ```
