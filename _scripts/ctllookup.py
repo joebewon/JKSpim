@@ -126,4 +126,5 @@ def write_tables(outpath):
 
 write_tables('/home/claude/ctl_tables.s')
 
-##################### This script was written with the help of Claude.ai #####################
+##################### This script was written with the assistance of Claude.ai and ran within the Claude.ai workspace #####################
+#####################                           The output can be found in /src/CTLTables.s                           #####################

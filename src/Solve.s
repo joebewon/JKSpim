@@ -186,14 +186,83 @@ CTLSolve2:
             j CS2N_Encode_Residual_For
 
         CS2N_Encode_Residual_Rof:
-            # CLTLUT2 $t3, $s3, $s4 - Somehow @TODO - Assume $t3 has the correct address.
+            # CLTLUT2 $t3, $s3, $s4 - Somehow @TODO - Assume $t3 has the correct address for now
             mul     $t2, $t2, 2                             # $t2 = last_row_residual*2
             add     $t3, $t3, $t2                           # $t3 = &CLT_LUT_2[num_rows][num_cols][last_row_residual]
-            lhu     $t3, 0($t3)                             # <$t3> int first_row_enumerate = CLT_LUT_2[num_rows][num_cols][last_row_residual];
+            lhu     $t3, 0($t3)                             # <$t3?> int first_row_enumerate = CLT_LUT_2[num_rows][num_cols][last_row_residual];
 
             move    $v0, $0
             beq     $t3, $0, CS2_Return                     # if first_row_enumerate == 0, return false;
 
+        move    $s1, $0                                     # int j = 0;
+        CS2N_Toggle_Top_For:
+            bge     $s1, $s4, CS2N_Toggle_Top_Rof           # if j >= num_cols, goto CS2N_Toggle_Top_Rof
+            srlv    $t4, $t3, $s1                           # $t4 = first_row_enumerate >> j
+            and     $t4, $t4, 1                             # $t4 = (first_row_enumerate >> j) & 1
+            bne     $t4, 1, CS2N_Toggle_Top_For_Inc         # if ((first_row_enumerate >> j) & 1) != 1, goto CS2N_Toggle_Top_For_Inc
+            
+            # solution[0][j] = 1 - solution[0][j];
+            add     $t4, $s2, $s1                           # $t4 = &solution[0][j] equiv solution + j
+            lbu     $t5, 0($t4)                             # $t5 = solution[0][j]
+            li      $t6, 1                                  # $t6 = 1
+            sub     $t5, $t6, $t5                           # $t5 = 1 - solution[0][j]
+            sb      $t5, 0($t4)                             # solution[0][j] = 1 - solution[0][j];
+
+            # ToggleLight(board_ptr, 0, j, 1);
+            move    $a0, $s5                                # $a0 = board_ptr
+            move    $a1, $0                                 # $a1 = 0
+            move    $a2, $s1                                # $a2 = j
+            li      $a3, 1                                  # $a3 = 1
+            jal ToggleLight                                 # ToggleLight(board_ptr, 0, j, 1);
+
+            CS2N_Toggle_Top_For_Inc:
+                add     $s1, $s1, 1                         # ++j;
+                j       CS2N_Toggle_Top_For
+
+        CS2N_Toggle_Top_Rof:
+            # Second Pass
+            li      $s0, 1                                  # <$s0!> int i = 1;
+        CS2N_2Pass_OFor:
+            bge     $s0, $s3, CS2N_2Pass_ORof               # if i >= num_rows, goto CS2N_2Pass_ORof
+            li      $s1, 0                                  # <$s1!> int j = 0;
+            CS2N_2Pass_IFor:
+                bge     $s1, $s4, CS2N_2Pass_IRof           # if i >= num_rows, goto CS2N_2Pass_IRof
+
+                # $t0 = board_ptr[i - 1][j]
+                sub     $t0, $s0, 1                         # $t0 = i - 1
+                mul     $t0, $t0, $s4                       # $t0 = (i - 1)*num_cols
+                add     $t0, $t0, $s1                       # $t0 = (i - 1)*num_cols + j
+                add     $t0, $s5, $t0                       # $t0 = &board_ptr[i - 1][j]
+                lbu     $t0, 0($t0)                         # $t0 = board_ptr[i - 1][j]
+                bne     $t0, 1, CS2N_2Pass_IFor_Inc         # if board_ptr[i - 1][j] != 1, goto CS2N_2Pass_IFor_Inc
+
+                # solution[i][j] = 1 - solution[i][j];
+                mul     $t0, $s0, $s4                       # $t0 = i*num_cols
+                add     $t0, $t0, $s1                       # $t0 = i*num_cols + j
+                add     $t0, $s2, $t0                       # $t0 = &solution[i][j]
+                lbu     $t1, 0($t0)                         # $t1 = solution[i][j]
+                li      $t2, 1                              # $t2 = 1
+                sub     $t1, $t2, $t1                       # $t1 = 1 - solution[0][j]
+                sb      $t1, 0($t0)                         # solution[0][j] = 1 - solution[0][j];
+
+                # ToggleLight(board_ptr, i, j, 1);
+                move    $a0, $s5                            # $a0 = board_ptr
+                move    $a1, $s0                            # $a1 = i
+                move    $a2, $s1                            # $a2 = j
+                li      $a3, 1                              # $a3 = 1
+                jal     ToggleLight                         # ToggleLight(board_ptr, i, j, 1);
+
+                CS2N_2Pass_IFor_Inc:
+                    add     $s1, $s1, 1
+                    j       CS2N_2Pass_IFor
+            CS2N_2Pass_IRof:
+                # pass and directly increment i
+                add     $s0, $s0, 1
+                j       CS2N_2Pass_OFor
+        CS2N_2Pass_ORof:
+            li      $t1, 1                                  # $v0 = true
+            j       CS2_Return                              # return true;
+            
     CS2T:
         # First Pass
     CS2_Return:
