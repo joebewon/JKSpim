@@ -211,7 +211,6 @@ From the above observations, we can derive the following algorithms.
 // This is pseudocode, so the syntax isn't perfect
 // This is not meant to be directly compiled
 
-// ------------- num_lights == 2 case
 bool CTLSolve2(LightsOuts* puzzle, unsigned char* board_buff, unsigned char* solution) {
     const int num_rows = puzzle->num_rows;
     const int num_cols = puzzle->num_cols;
@@ -237,6 +236,7 @@ bool CTLSolve2(LightsOuts* puzzle, unsigned char* board_buff, unsigned char* sol
         }
 
         // Shortcirucuit if we just so happen to be done.
+        // It's this check is part of what allows the LUT to be as small as possible
         if (BoardDone(board_ptr)) return true;
 
         const int last_row_residual = EncodeResidual2(board_ptr, num_rows, num_cols);
@@ -247,10 +247,10 @@ bool CTLSolve2(LightsOuts* puzzle, unsigned char* board_buff, unsigned char* sol
         if (first_row_enumerate == 0) return false;
 
         // Toggle the top row based on the first row enumerate
-        for (uint8_t i = 0; i < num_cols; ++i) {
-            if ((first_row_enumerate >> i) & 1 == 1) {
-                toggle_light(board_ptr, 0, i, 1);
-                solution[0][i] = 1;
+        for (uint8_t j = 0; j < num_cols; ++j) {
+            if (((first_row_enumerate >> j) & 1) == 1) {
+                toggle_light(board_ptr, 0, j, 1);
+                solution[0][j] = 1 - solution[0][j];
             }
         }
 
@@ -266,7 +266,7 @@ bool CTLSolve2(LightsOuts* puzzle, unsigned char* board_buff, unsigned char* sol
             for (uint8_t j = 0; j < num_cols; ++j) {
                 if (board_ptr[i - 1][j] == 1) {
                     toggle_light(board_ptr, i, j, 1);
-                    solution[i][j] = 1;
+                    solution[i][j] = 1 - solution[i][j];
                 }
             }
         }
@@ -300,7 +300,8 @@ bool CTLSolve2(LightsOuts* puzzle, unsigned char* board_buff, unsigned char* sol
         }
 
         // Shortcirucuit if we just so happen to be done.
-        if (BoardDone(board_ptr)) return true;
+        // It's this check is part of what allows the LUT to be as small as possible
+        if (BoardDone(board_buff)) return true;
 
         const int last_row_residual = EncodeResidual2(board_buff, num_cols, num_rows);
 
@@ -310,10 +311,10 @@ bool CTLSolve2(LightsOuts* puzzle, unsigned char* board_buff, unsigned char* sol
         if (first_row_enumerate == 0) return false;
 
         // Toggle the top row based on the first row enumerate
-        for (uint8_t i = 0; i < num_rows; ++i) {
-            if ((first_row_enumerate >> i) & 1 == 1) {
-                toggle_light(board_buff, 0, i, 1);
-                solution[i][0] = 1; // Remember to reverse the indexing
+        for (uint8_t j = 0; j < num_rows; ++j) {
+            if (((first_row_enumerate >> j) & 1) == 1) {
+                toggle_light(board_buff, 0, j, 1);
+                solution[j][0] = 1 - solution[j][0]; // Remember to reverse the indexing
             }
         }
 
@@ -329,7 +330,7 @@ bool CTLSolve2(LightsOuts* puzzle, unsigned char* board_buff, unsigned char* sol
             for (uint8_t j = 0; j < num_rows; ++j) {
                 if (board_buff[i - 1][j] == 1) {
                     toggle_light(board_buff, i, j, 1);
-                    solution[j][i] = 1; // Remember to reverse the indexing
+                    solution[j][i] = 1 - solution[j][i]; // Remember to reverse the indexing
                 }
             }
         }
