@@ -115,15 +115,15 @@ CTLSolve2:
     move    $s2, $a1                                        # $s2! = solution
     lw      $s3, 0($a0)                                     # <$s3!> const int num_rows = puzzle->num_rows;
     lw      $s4, 4($a0)                                     # <$s4!> const int num_cols = puzzle->num_cols;
-    add     $s5, 12($a0)                                    # <$s5?> unsigned char* board_ptr = &puzzle->board;
+    add     $s5, $a0,12                                     # <$s5?> unsigned char* board_ptr = &puzzle->board;
     
-    move    $a0, $a1                                        # $a0 = solution
-    lw      $a1, 0($a0)                                     # $a1 = puzzle->num_rows
-    lw      $a2, 4($a0)                                     # $a2 = puzzle->num_cols
+    move    $a0, $s3                                        # $a0 = num_rows
+    move    $a1, $s4                                        # $a1 = num_cols
+    move    $a2, $s2                                        # $a2 = solution
     jal     ZeroBoard
 
 
-    bgt     $t1, $t0, CS2T
+    bgt     $s4, $s3, CS2T                                  # if num_cols > num_rows, goto CS2T
     CS2N:
         # First Pass
         li      $s0, 1                                      # <$s0!> int i = 1;
@@ -162,10 +162,11 @@ CTLSolve2:
                 add     $s0, $s0, 1
                 j       CS2N_1Pass_OFor
         CS2N_1Pass_ORof:
-            # Done Check @todo - Something is wrong with the function
-            move    $a0, $s5                                # $a0 = board_ptr
+            move    $a0, $s3                                # $a0 = num_rows
+            move    $a1, $s4                                # $a1 = num_cols
+            move    $a2, $s5                                # $a2 = board_ptr
             jal     BoardDone
-            beq     $v0, 1, CS2_Return                      # if (BoardDone(board_ptr)) return true;
+            beq     $v0, 1, CS2_Return                      # if (BoardDone(num_rows, num_cols, board_ptr)) return true;
 
             # const int last_row_residual = EncodeResidual2(board_ptr, num_rows, num_cols);
             li      $s1, 0                                  # int j = 0;
@@ -259,25 +260,25 @@ CTLSolve2:
                 add     $s0, $s0, 1
                 j       CS2N_2Pass_OFor
         CS2N_2Pass_ORof:
-            li      $t1, 1                                  # $v0 = true
+            li      $v0, 1                                  # $v0 = true
             j       CS2_Return                              # return true;
 
     CS2T:
         move    $a0, $s5                                    # $a0 = board_ptr
         lw      $a1, 36($sp)                                # $a1 = board_buff
-        move    $a2, $s2                                    # $a2 = num_rows
-        move    $a3, $s3                                    # $a3 = num_cols
-        jal     CoptT                                       # CopyT(board_ptr, board_buff, num_rows, num_cols);
+        move    $a2, $s3                                    # $a2 = num_rows
+        move    $a3, $s4                                    # $a3 = num_cols
+        jal     CopyT                                       # CopyT(board_ptr, board_buff, num_rows, num_cols);
 
         lw      $s5, 36($sp)                                # $s5! = board_buff
 
         # First Pass
         li      $s0, 1                                      # <$s0!> int i = 1;
         CS2T_1Pass_OFor:
-            bge     $s0, $s3, CS2T_1Pass_ORof               # if i >= num_cols, goto CS2T_1Pass_ORof
+            bge     $s0, $s4, CS2T_1Pass_ORof               # if i >= num_cols, goto CS2T_1Pass_ORof
             li      $s1, 0                                  # <$s1!> int j = 0;
             CS2T_1Pass_IFor:
-                bge     $s1, $s4, CS2T_1Pass_IRof           # if i >= num_rows, goto CS2T_1Pass_IRof
+                bge     $s1, $s3, CS2T_1Pass_IRof           # if i >= num_rows, goto CS2T_1Pass_IRof
 
                 # $t0 = board_buff[i - 1][j]
                 sub     $t0, $s0, 1                         # $t0 = i - 1
@@ -309,10 +310,11 @@ CTLSolve2:
                 add     $s0, $s0, 1
                 j       CS2T_1Pass_OFor
         CS2T_1Pass_ORof:
-            # Done Check @todo - Something is wrong with the function
-            move    $a0, $s5                                # $a0 = board_buff
+            move    $a0, $s4                                # $a0 = num_cols
+            move    $a1, $s3                                # $a1 = num_rows
+            move    $a2, $s5                                # $a2 = board_buff
             jal     BoardDone
-            beq     $v0, 1, CS2_Return                      # if (BoardDone(board_buff)) return true;
+            beq     $v0, 1, CS2_Return                      # if (BoardDone(num_cols, num_rows, board_buff)) return true;
 
             # const int last_row_residual = EncodeResidual2(board_buff, num_cols, num_rows);
             li      $s1, 0                                  # int j = 0;
@@ -408,11 +410,18 @@ CTLSolve2:
                 add     $s0, $s0, 1
                 j       CS2T_2Pass_OFor
         CS2T_2Pass_ORof:
-            li      $t1, 1                                  # $v0 = true
+            li      $v0, 1                                  # $v0 = true
             j       CS2_Return                              # return true;
-
     CS2_Return:
         lw      $ra, 0($sp)
+
+        lw      $s0, 4($sp)
+        lw      $s1, 8($sp)
+        lw      $s2, 12($sp)
+        lw      $s3, 16($sp)
+        lw      $s4, 20($sp)
+        lw      $s5, 24($sp)
+
         add     $sp, $sp, 40
         jr      $ra
 
@@ -426,7 +435,7 @@ CTLSolve2:
 #
 # @Returns:
 # - $v0 (bool): Solved the Puzzle Correctly
-CTLSolve2:
+CTLSolve3:
 
 # @function
 #
@@ -442,36 +451,72 @@ CTLSolve2:
 #
 # @Returns: Void
 CopyT:
+    li      $t0, 1                          # int i = 0;
+    CT_O_For:
+        bge     $t0, $a2, CT_O_Rof          # if i >= num_rows, goto CT_O_Rof
+        li      $t1, 1                      # int j = 0;
+        CT_I_For:
+            bge     $t1, $a3, CT_I_Rof      # if j >= num_cols, goto CT_I_Rof
+            
+            mul     $t2, $t0, $a3           # $t2 = i*num_cols
+            add     $t2, $t2, $t1           # $t2 = i*num_cols + j
+            add     $t2, $a0, $t2           # $t2 = &board_ptr[i][j]
+            lbu     $t2, 0($t2)             # $t2 = board_ptr[i][j]
 
+            mul     $t3, $t0, $a2           # $t3 = i*num_rows
+            add     $t3, $t3, $t1           # $t3 = i*num_rows + j
+            add     $t3, $a0, $t3           # $t3 = &board_ptr[i][j]
+            sb      $t2, 0($t3)             # board_buff[i][j] = board_ptr[i][j];
+
+            add     $t1, $t1, 1             # ++j;
+            j       CT_I_For
+        CT_I_Rof:
+            add     $t0, $t0, 1             # ++i;
+            j       CT_O_For
+    CT_O_Rof:
+        jr		$ra					        # return void;
+    
 # @function
 #
 # Efficiently checks if a puzzle is solved
 #
-# @UsedTemporaries: $t0, $t1, $t2, $t3
+# @UsedTemporaries: $t0, $t1, $t2, $t3, $t4, $t5, $t6
 #
 # @Params:
-# - $a1 (int num_rows): The number of rows
+# - $a0 (int num_rows): The number of rows
 # - $a1 (int num_cols): The number of columns
 # - $a2 (unsigned char* board): Pointer to the board matrix we want to check completion for
 #
 # @Returns:
 # - $v0 (bool): Whether or not the puzzle is actually solved
 BoardDone:
+    la      $t5, zerotailmasklookup                     # $t5 = &zerotailmasklookup
+    mul     $t4, $a1, 16                                # $t4 = num_cols*16
+    add     $t5, $t5, $t4                               # <$t5!> int* masks = &zerotailmasklookup + num_cols*16
+
     sub     $t4, $a0,  1                                # $t4 = num_rows - 1
     mul     $t4, $t4, $a1                               # $t4 = (num_rows - 1)*num_cols
-    add     $t4, $a2, $t4                               # $t4 = &board[num_rows - 1][0] equiv. $t4 = &board[(num_rows - 1)*num_cols + 0] equiv. $t4 = &board[(num_rows - 1)*num_cols]
+    add     $t4, $a2, $t4                               # $t4! = &board[num_rows - 1][0] equiv. $t4 = &board[(num_rows - 1)*num_cols + 0] equiv. $t4 = &board[(num_rows - 1)*num_cols]
 
     lwl     $t0, 0($t4)                                 # Load the first of the four bytes that make up the last row
     lwr     $t0, 3($t4)
+    lw      $t6, 0($t5)                                 # $t6 = masks[0]
+    and     $t0, $t0, $t6                               # words[0] &= masks[0]
 
     lwl     $t1, 4($t4)                                 # Load the second of the four bytes that make up the last row
     lwr     $t1, 7($t4)
+    lw      $t6, 4($t5)                                 # $t6 = masks[1]
+    and     $t1, $t1, $t6                               # words[1] &= masks[2]
 
     lwl     $t2, 8($t4)                                 # Load the third of the four bytes that make up the last row
     lwr     $t2, 11($t4)
+    lw      $t6, 8($t5)                                 # $t6 = masks[2]
+    and     $t2, $t2, $t6                               # words[2] &= masks[2]
 
     lwl     $t3, 12($t4)                                # Load the fourth of the four bytes that make up the last row
     lwr     $t3, 15($t4)
+    lw      $t6, 12($t5)                                # $t6 = masks[3]
+    and     $t3, $t3, $t6                               # words[3] &= masks[3]
 
     or      $v0, $t0, $t1                               # $v0 = words[0] | words[1]
     or      $v0, $v0, $t2                               # $v0 = words[0] | words[1] | words[2]
@@ -484,12 +529,14 @@ BoardDone:
 
 # @function
 #
-# Zeros a board
+# Zeros a solution matrix
 #
 # @UsedTemporaries: $t0, $t1, $t2, $t3
 #
 # @Params:
-# - $a0 (unsigned char* board): Pointer to the board matrix we want to zero
+# - $a0 (int num_rows): The number of rows
+# - $a1 (int num_cols): The number of cols
+# - $a2 (unsigned char* solution): Pointer to the solution matrix we want to zero
 #
 # @Returns: void
 ZeroBoard:
@@ -611,4 +658,6 @@ ToggleLight:
 
     DONE:
         jr      $ra
+
+################## ################## import ZeroTailMaskLookup.s ################## ##################
 ################## ################## import CTLLookups.s ################## ##################

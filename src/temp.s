@@ -1,19 +1,19 @@
     CS2T:
         move    $a0, $s5                                    # $a0 = board_ptr
         lw      $a1, 36($sp)                                # $a1 = board_buff
-        move    $a2, $s2                                    # $a2 = num_rows
-        move    $a3, $s3                                    # $a3 = num_cols
-        jal     CoptT                                       # CopyT(board_ptr, board_buff, num_rows, num_cols);
+        move    $a2, $s3                                    # $a2 = num_rows
+        move    $a3, $s4                                    # $a3 = num_cols
+        jal     CopyT                                       # CopyT(board_ptr, board_buff, num_rows, num_cols);
 
         lw      $s5, 36($sp)                                # $s5! = board_buff
 
         # First Pass
         li      $s0, 1                                      # <$s0!> int i = 1;
         CS2T_1Pass_OFor:
-            bge     $s0, $s3, CS2T_1Pass_ORof               # if i >= num_cols, goto CS2T_1Pass_ORof
+            bge     $s0, $s4, CS2T_1Pass_ORof               # if i >= num_cols, goto CS2T_1Pass_ORof
             li      $s1, 0                                  # <$s1!> int j = 0;
             CS2T_1Pass_IFor:
-                bge     $s1, $s4, CS2T_1Pass_IRof           # if i >= num_rows, goto CS2T_1Pass_IRof
+                bge     $s1, $s3, CS2T_1Pass_IRof           # if i >= num_rows, goto CS2T_1Pass_IRof
 
                 # $t0 = board_buff[i - 1][j]
                 sub     $t0, $s0, 1                         # $t0 = i - 1
@@ -144,5 +144,5 @@
                 add     $s0, $s0, 1
                 j       CS2T_2Pass_OFor
         CS2T_2Pass_ORof:
-            li      $t1, 1                                  # $v0 = true
+            li      $v0, 1                                  # $v0 = true
             j       CS2_Return                              # return true;

@@ -65,6 +65,8 @@ lwr $t3, 15($t9)
 
 This is always better than a for loop, because a single iteration of the equivalent loop is at minimum 8 instructions.
 
+However, we also need to zero out the tail of the board or else we will have dirty cells. However, since the last row will always fit inside the puzzle struct, we can have a lookup table that gives us the four bit masks to use on the four words. See [ZeroTailMaskLookup.s](/JKSpim/src/ZeroTailMaskLookup.s)
+
 #### TEMP
 ```c++
 // This is pseudocode, so the syntax isn't perfect
