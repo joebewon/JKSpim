@@ -179,8 +179,8 @@ CTLSolve2:
             add     $t1, $s5, $t1                           # $t1 = &board_ptr[num_rows - 1][j]
             lbu     $t1, 0($t1)                             # $t1 = board_ptr[num_rows - 1][j]
             
-            add     $t2, $t2, $t1                           # last_row_residual += board_ptr[num_rows - 1][j];
             sll     $t2, $t2, 1                             # last_row_residual <<= 1;
+            add     $t2, $t2, $t1                           # last_row_residual += board_ptr[num_rows - 1][j];
 
             add     $s1, $s1, 1
             j CS2N_Encode_Residual_For
@@ -328,8 +328,8 @@ CTLSolve2:
             add     $t1, $s5, $t1                           # $t1 = &board_buff[num_cols - 1][j]
             lbu     $t1, 0($t1)                             # $t1 = board_buff[num_cols - 1][j]
             
-            add     $t2, $t2, $t1                           # last_row_residual += board_buff[num_rows - 1][j];
             sll     $t2, $t2, 1                             # last_row_residual <<= 1;
+            add     $t2, $t2, $t1                           # last_row_residual += board_buff[num_rows - 1][j];
 
             add     $s1, $s1, 1
             j CS2T_Encode_Residual_For

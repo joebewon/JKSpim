@@ -380,7 +380,7 @@ bool CTLSolve3(LightsOuts* puzzle, unsigned char* solution, unsigned char* board
     // Also not storing the lookup table for space efficiency
     // Likely check before entering the routine.
     // There is no reason to waste the stack frame in this case
-    if (min(num_rows, num_cols) > 10) return false;
+    if (min(num_rows, num_cols) > 7) return false;
 
     if (num_cols <= num_rows) {
         // Zero the solution board
@@ -419,7 +419,7 @@ bool CTLSolve3(LightsOuts* puzzle, unsigned char* solution, unsigned char* board
             int action = ((first_row_enumerate >> (2*j)) & 3);
             if (action != 0) {
                 solution[0][j] += action;
-                solution[0][j] -= (val >= 3) * 3; // Slick trick, gamer.
+                solution[0][j] -= (solution[0][j] >= 3) * 3; // Slick trick, gamer.
                 toggle_light(board_ptr, 0, j, action);
             }
         }
@@ -438,7 +438,7 @@ bool CTLSolve3(LightsOuts* puzzle, unsigned char* solution, unsigned char* board
                 if (val != 0) {
                     int action = 3 - val;
                     solution[i][j] += action;
-                    solution[i][j] -= (val >= 3) * 3; // Slick trick, gamer.
+                    solution[i][j] -= (solution[i][j] >= 3) * 3; // Slick trick, gamer.
                     toggle_light(board_ptr, i, j, action);
                 }
             }
