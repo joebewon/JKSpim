@@ -43,3 +43,6 @@ Where the states are as follows:
 Specifically, this is an NFA with episilon transitions. In addition, all transitions, except `move` transitions are taken immeditaly without leaving the interrupt handler.
 
 In the code, the way this works is that whenever `jal FSMTransitionFunction` is called, it checks a variable in memory for what state its on, performs the actions tied to that state, and then transitions the state.
+
+## Playpen Unlock Interrupt
+Our strategy is so aggressive that we are better off not acting on the playpen unlock interrupt. In addition, if our opponent stops what they are doing to lock their pen, we will already be on our way to our next bunny. However, the interrupt is being acknowldge when it happens for the sake of getting thqualification points.

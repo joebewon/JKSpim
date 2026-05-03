@@ -196,7 +196,7 @@ However, this comes at the huge cost of space.
 ### Optimizations for Space
 Every board configuration needs its own lookup table, which explodes very quickly, especially for $l = 3$.
 
-The biggest issue is that `spimbot.s` can be a maximum of 5MB and all of the tables need to be hardcoded in the data segment. However, we can be smarter and but the total size of all of the tables stored down to only 1.16 MB, which should fit within `spimbot.s`.
+The biggest issue is that `spimbot.s` can be a maximum of 5MB and all of the tables need to be hardcoded in the data segment. However, we can be smarter and but the total size of all of the tables stored down to fit within `spimbot.s`.
 
 First, we can always transpose the board to have the shorter side as the columns, adding $O(nm)$ some of the time. However, this cuts the total size of the tables down in half.
 
@@ -218,7 +218,13 @@ m(16, 9) = 1527944 \ \ \text{bytes} \equiv 1.5 \text{MB} \newline
 m(16, 10) = 3181316 \ \ \text{bytes} \equiv 3.2 \text{MB}
 ```
 
-We will chose $y = 10$. I.e., if $l = 3$ and $min(n,m) > 10$, we just skip solving the puzzle entirely.
+However, after generating the tables, we see that we are actually limited to $y = 7$, because the text file is way bigger than what is actually stored in memory.
+
+Therefore, we will chose $y = 7$. I.e., if $l = 3$ and $min(n,m) > 7$, we just skip solving the puzzle entirely.
+
+To even further optimize for file size, we can hardcode the first row enumerates as hexadecimal instead of decimal, squeezing every last bit of file space possible.
+
+After a lot of prototyping on the puzzle board size bounds themselves with the assistance of Claude.ai, we were able to generate the tables, resulting in a file that is 2.866 MB in size, double that of our arctan2 lookup table.
 
 ### Algorithm
 From the above observations, we can derive the following algorithms.

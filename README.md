@@ -7,20 +7,20 @@ Repository for our entry for Lab 14 for CS 233 SP2026 Spimbot Tournament
 The [Theory](./Theory/README.md) directory contains documentation on the theory that will be applied in our project.
 
 ## ToDos:
-- [ ] Get diagonal movement working
-  - [ ] Use timer interrupt
-  - [ ] Optimize
+- [x] Get diagonal movement working
+  - [x] Use timer interrupt
+  - [x] Optimize
     - There are things we can do to make trig fast, but I do not know what there OTOMH --Joseph Habisohn
   - Likely ok to stopping the bot within the interrupt handler as a hack as to make puzzle solving while moving easier to manage in code. It will keep code jumping as automatic as possible. --Joseph Habisohn
-- [ ] Optimize Puzzle Solving
-  - [ ] Get puzzle solving to work while moving
+- [ ] Optimize Puzzle Solving ----- Couldn't get the super fast one done in time
+  - [x] Get puzzle solving to work while moving
     - On its own, moving with the timer interrupt does this inherrently, we just need to figure out where in the strategy to start solving a puzzle. --Joseph Habisohn
     - We can possibly chunk the algorithm to make things easier to manage. --Joseph Habisohn
   - As fast as possible. It is deterministic and a solved problem. --Joseph Habisohn
-- [ ] Implement a better bunny picking algorithm. See the Greedy Punny Picking Algorithm.
-- [ ] Implement the playpen unlock interrupt
-  - [ ] Determine is its needed
-    - [ ] Determine where it would be in the strategy if it is
+- [X] Implement a better bunny picking algorithm. See the Greedy Punny Picking Algorithm.
+- [x] Implement the playpen unlock interrupt
+  - [x] Determine is its needed. ----- Its not needed. Turns out we are better without it than with it, though we are acknowledging it for the sake of qualification.
+    - [x] Determine where it would be in the strategy if it is.
 
 # How to work with spimbot
 

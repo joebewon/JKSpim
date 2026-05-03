@@ -235,24 +235,27 @@ CopyT:
 # @UsedTemporaries: $t0, $t1, $t2, $t3
 #
 # @Params:
-# - $a0 (unsigned char* board): Pointer to the board matrix we want to check completion for
+# - $a1 (int num_rows): The number of rows
+# - $a1 (int num_cols): The number of columns
+# - $a2 (unsigned char* board): Pointer to the board matrix we want to check completion for
 #
 # @Returns:
 # - $v0 (bool): Whether or not the puzzle is actually solved
 BoardDone:
-    li      $t4, 240                                    # $t4 = 240 (15*16, the index of the first element of the last row.
-    add     $t4, $a0, $t4                               # $t4 = &board[15*16][0] equiv. $t4 = &board[15*16 + 0] equiv. $t4 = &board[15*16]
+    sub     $t4, $a0,  1                                # $t4 = num_rows - 1
+    mul     $t4, $t4, $a1                               # $t4 = (num_rows - 1)*num_cols
+    add     $t4, $a2, $t4                               # $t4 = &board[num_rows - 1][0] equiv. $t4 = &board[(num_rows - 1)*num_cols + 0] equiv. $t4 = &board[(num_rows - 1)*num_cols]
 
-    lwl     $t0, 0($t4)                                 # Load the first of the four words that make up the last row
+    lwl     $t0, 0($t4)                                 # Load the first of the four bytes that make up the last row
     lwr     $t0, 3($t4)
 
-    lwl     $t1, 4($t4)                                 # Load the second of the four words that make up the last row
+    lwl     $t1, 4($t4)                                 # Load the second of the four bytes that make up the last row
     lwr     $t1, 7($t4)
 
-    lwl     $t2, 8($t4)                                 # Load the third of the four words that make up the last row
+    lwl     $t2, 8($t4)                                 # Load the third of the four bytes that make up the last row
     lwr     $t2, 11($t4)
 
-    lwl     $t3, 12($t4)                                # Load the fourth of the four words that make up the last row
+    lwl     $t3, 12($t4)                                # Load the fourth of the four bytes that make up the last row
     lwr     $t3, 15($t4)
 
     or      $v0, $t0, $t1                               # $v0 = words[0] | words[1]

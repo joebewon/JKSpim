@@ -1,1 +1,70 @@
-# put your write up for Lab Spimbot here
+# Main Report
+We landed on a hyper aggressive game strategy, where we constantly cycle through
+picking up bunnies, dropping them off, and unlocking the enemy playpen. The full
+details of which are described in https://github.com/joebewon/JKSpim/blob/main/Theory/1GameStrategy.md,
+but the gist of our strategy is as follows:
+
+```
+loop:
+  loop until bunny picked up:
+    pick bunny
+    move to bunny
+    attempt pick up bunny
+    check if bunny picked up
+  move to our playpen
+  lock playpen if needed
+  drop bunny
+  if allowed to unlock enemy playpen
+    move to opponent playpen
+    unlock opponent playpen
+```
+
+As you may notice, solving puzzles is not listed here. That is because,
+solving puzzles is treated as a background process that is on an infinite loop.
+The way we decided to implement that, is to have the user code just be preprocessing
+and the a puzzle solving infinite loop. Then, the interrupt handler drives the FSM
+that handles the actions for the strategy. This makes code management really easy,
+because saving and jumping back to the right part of an unfinished puzzle solve
+is handled automatically by the kernel. In addition, it means that we never have to
+wait for a puzzle to be done to do an action in the strategy.
+
+To actually be able to have this seperation of roles, the most important part of the project
+becomes optizmizing movement. For starters, we need the movement on a timer interrupt,
+that we we can continue to solve puzzles while we move, while also keeping the amount of time
+within the interrupt handler as small as possible, and second, get diagonal movement to work,
+to get to the currect FSM state target location as fast as possible.
+
+Figuring out the floating point side of the processor entailed just finding 
+the list of instructions somewhere, which we found to three sources for:
+1. https://drive.google.com/file/d/0BxafEOOa5u25emxNV1ZLU3RSeTQ/view?resourcekey=0-6NN4_OhvFTIa40a8VXxeGw
+2. https://class.ece.iastate.edu/cpre381/resources/programming_with_QtSpim.pdf
+3. https://github.com/cs233/vim-mips/blob/master/syntax/mips.vim
+
+What's more interesting is our arctan2 optimizaion. We realized that there are a
+finite amount of possible angles to tur to, because we are always quantized to
+integer pixel values. This allowed to implement a lookup table that maps the pair (deltaX, yeltaY)
+to an integer that is the correct angle to set our absolute orientation to.
+To make it faster and more space effiencient, we have the base pointer of the lookup table,
+be the center of the matrix, allowing deltaX and deltaY to be negative, while also condensing the angles
+into halfwords as values from -180 degrees to 180 degrees only need 16 bits to be encoded. This
+minimizes the memory and file size usage of the lookup table while also allowing us to compute
+arctan2(deltaY, deltaX) in one step. The table can be viewed here: https://github.com/joebewon/JKSpim/blob/main/src/Atan2lookup.s.
+
+Our magnum opus of the project, however, is our bunny picking algorithm, which is
+specified in full here: https://github.com/joebewon/JKSpim/blob/main/Theory/2GreedyBunnyPicking.md.
+The big idea about this algorithm, is that it weighs each bunny by a ration of its weight in zetners, to the total distance
+from the spimbot to the bunny and the bunny to our playpen. Then by ignoring all bunnies that will jump before
+we would reach them, we can choose the bunny with the biggest weight to total distance ratio, therebye always
+maximizing our change in zetners with respect to time.
+
+Although our main focus was on all of the above, we were also trying to optimize puzzle solving. When doing research, we came up with few ideas:
+Modular Gaussian Eliminiation, turning the given solver iterative, and Chase the Lights. At first, we were trying to turn the given solver iterative
+and optimizing it by transposing the board to have the columns be the smaller dimension while also researching Modular Guassian Elimination.
+The idea was to branch on board configuration and choose the faster one, as the iterative given solver can theoreticall beat Guassian Elimination.
+Unfortunately, we paused the idea because it was taking too long. Even more unfortunately, we realized how fast Chase the Lights actually is with when using a look up table.
+Thus, although we have all of the psuedo code and part of the implementation, we could not get it done in time for the tournament.
+The details of this and what were able to get done are in https://github.com/joebewon/JKSpim/blob/main/Theory/3PuzzleSolvingOptimization.md.
+
+# Further Reading
+All of our theory work and documentation are easily available here: https://github.com/joebewon/JKSpim/blob/main/Theory/README.md.
+In addition, the readme of the repo itself has our ToDos that we marked off: https://github.com/joebewon/JKSpim/blob/main/README.md.
