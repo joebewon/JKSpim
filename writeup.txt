@@ -59,8 +59,8 @@ maximizing our change in zetners with respect to time.
 
 After watching a few matches, though, we saw that it is way better to pickup multiple bunnies in a row. After editing the FSM
 to reflect this change, we saw our score skyrocket when playing against ourselves, now allowing us to qualify against ourselves.
-In addition, we saw that a better bunny picking choice is the closest bunny as the other players that were choosing the closest bunny,
-were still beating us even after we allowed more bunnies to be picked up.
+In addition, we updated the Bunny Picking to only consider the distance from the bunny to the playpen if its the last bunny to be picked.
+Finally, we also added the playpen unlock interrupt later on to shortcicruit to playpen locking within the FSM.
 
 Although our main focus was on all of the above, we were also trying to optimize puzzle solving. When doing research, we came up with few ideas:
 Modular Gaussian Eliminiation, turning the given solver iterative, and Chase the Lights. At first, we were trying to turn the given solver iterative

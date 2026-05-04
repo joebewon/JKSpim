@@ -135,6 +135,10 @@
         beq     $t1, 3, FSM_3                           # if fsm_state == 3, go to FSM_3
 
         FSM_0:
+            la      $t0, playpen_unlocked
+            lbu     $t1, 0($t0)
+            beq     $t1, 1, FSM_N_To_Playpen            # Shorcircuit to moving to the playpen to lock it when unlocked
+
             jal     PickBestBunny                       # (Bunny* best_bunny, float best_bunny_dist) = PickBestBunny()
 
             lw      $a0, 0($v0)                         # $a0 = best_bunny->x
@@ -148,10 +152,15 @@
             li      $t1, 1                              # $t1 = 1
             sb      $t1, 0($t0)                         # fsm_state = 1;
             j       FSM_Return                          # return;
+
         FSM_1:
             sw      $0, CATCH_BUNNY
-            lw      $t0, MMIO_STATUS
 
+            la      $t0, playpen_unlocked
+            lbu     $t1, 0($t0)
+            beq     $t1, 1, FSM_1_Picking_Done          # Shorcircuit to having picking being done as the playpen just got unlocked
+
+            lw      $t0, MMIO_STATUS
             la      $t3, num_bunnies_picked
             lw      $t1, 0($t3)
             li      $t2, 1
@@ -168,17 +177,22 @@
                 la      $t3, num_bunnies_picked
                 sw      $0, 0($t3)
 
+            FSM_N_To_Playpen:
                 la      $t0, playpen_x                  # $t0 = &playpen_x
                 lw      $a0, 0($t0)                     # $a0 = playpen_x | Extract x coordinate
                 lw      $a1, 4($t0)                     # $a0 = playpen_y | Extract shifted y coordinate
                 jal     Move                            # Move(playpen_x, playpen_y); | Asynchronous Move
-                
+
                 la      $t0, fsm_state                  # $t0 = &fsm_state
                 li      $t1, 2                          # $t1 = 2
                 sb      $t1, 0($t0)                     # fsm_state = 2;
                 j       FSM_Return                      # return;
         FSM_2:
             sw      $0, LOCK_PLAYPEN                    # Lock the playpen
+
+            la      $t0, playpen_unlocked
+            sb      $0, 0($t0)
+
             lw      $t0, NUM_BUNNIES_CARRIED            # $t0 = *NUM_BUNNIES_CARRIED
             sw      $t0, PUT_BUNNIES_IN_PLAYPEN         # Put all of the bunnies in our playpen
 
@@ -221,6 +235,10 @@
             sw      $t1, 0($t0)                         # timestamp_can_unlock_enemy = *timer + 100000
             
             FSM_3_Continue:
+                la      $t0, playpen_unlocked
+                lbu     $t1, 0($t0)
+                beq     $t1, 1, FSM_1_Picking_Done      # Shorcircuit to locking our playpen
+                
                 la      $t0, fsm_state                  # $t0 = &fsm_state
                 sb      $0, 0($t0)                      # fsm_state = 0;
                 j       FSM_0                           # Immediatly look for the next bunny
@@ -380,8 +398,8 @@
         lw      $t1, 0($t0)                     # <$t1!> int num_bunnies = bunnies_info->num_bunnies;
 
         add     $v0, $t0, 4                     # <$v0!> Bunny* best_bunny = &bunnies_info->info[0];
-        li      $t2, 0x7F800000
-        mtc1    $t2, $f0                        # $f0 = +infinity
+        mtc1    $zero, $f0                      # <$f0!> float best_bunny_dist = 0.0f;
+        mtc1    $zero, $f2                      # <$f2!> float biggest_ratio = 0.0f;
         
         move    $t2, $0                         # <$t2!> int i = 0;
         PBB_For:
@@ -407,12 +425,64 @@
             add.s   $f3, $f4, $f3               # $f3 = static_cast<float>(bot->x - b->x)**2 + static_cast<float>(bot->y - b->y)**2
             sqrt.s  $f3, $f3                    # <$f3!> float cycles_from_bot_to_bunny = sqrt((bot->x - b->x)**2 + (bot->y - b->y)**2);
 
-            PBB_For_If:
-                c.lt.s  $f3, $f0                # FPCond = cycles_from_bot_to_bunny < best_bunny_dist
-                bc1f    PBB_For_Inc             # if cycles_from_bot_to_bunny >= best_bunny_dist, goto PBB_For_Inc
+            lw      $t4, 12($t3)                # $t4 = b->remaining_cycles;
+            mtc1    $t4, $f4                    # $f4 <-- $t4
+            cvt.s.w $f4, $f4                    # $f4 = static_cast<float>(b->remaining_cycles)
 
+            c.le.s  $f4, $f3                    # FPCond = b->remaining_cycles <= cycles_from_bot_to_bunny
+            bc1t    PBB_For_Inc                 # if (b->remaining_cycles {$f4} <= cycles_from_bot_to_bunny {$f3}) continue;
+
+            mtc1    $0, $f4                     # <$f4> float cycles_from_bunny_to_playpen = 0;
+            la      $t4, num_bunnies_picked     # $t4 = &num_bunnies_picked
+            lw      $t4, 0($t4)                 # $t4 = num_bunnies_picked
+            blt     $t4, 5, PBB_Skip_Playpen    # if num_bunnies_picked < 5, goto PBB_Skip_Playpen
+                # <$f4> float cycles_from_bunny_to_playpen = sqrt((playpen_x - b->x)**2 + (playpen_y - b->y)**2);
+                lw      $t4, 0($t3)                 # $t4 = b->x
+                la      $t5, playpen_x              # $t5 = &playpen_x
+                lw      $t5, 0($t5)                 # $t5 = playpen_x
+                sub     $t4, $t5, $t4               # $t4 = playpen_x - b->x
+                mtc1    $t4, $f4                    # $f4 <-- playpen_x - b->x
+                cvt.s.w $f4, $f4                    # $f4 = static_cast<float>(playpen_x - b->x)
+                mul.s   $f4, $f4, $f4               # $f4 = static_cast<float>(playpen_x - b->x)**2
+
+                lw      $t4, 4($t3)                 # $t4 = b->y
+                la      $t5, playpen_y              # $t5 = &playpen_y
+                lw      $t5, 0($t5)                 # $t5 = playpen_y
+                sub     $t4, $t5, $t4               # $t4 = playpen_y - b->y
+                mtc1    $t4, $f5                    # $f5 <-- playpen_y - b->y
+                cvt.s.w $f5, $f5                    # $f5 = static_cast<float>(playpen_y - b->y)
+                mul.s   $f5, $f5, $f5               # $f5 = static_cast<float>(playpen_y - b->y)**2
+
+                add.s   $f4, $f4, $f5               # $f3 = static_cast<float>(playpen_x - b->x)**2 + static_cast<float>(playpen_y - b->y)**2
+                sqrt.s  $f4, $f4                    # # <$f4> float cycles_from_bunny_to_playpen = sqrt((playpen_x - b->x)**2 + (playpen_y - b->y)**2);
+
+            PBB_Skip_Playpen:
+                add.s   $f4, $f3, $f4               # <$f4> float travel_time = cycles_from_bot_to_bunny + cycles_from_bunny_to_playpen;
+                lw      $t4, 8($t3)                 # $t4! = b->weight
+                mtc1    $t4, $f5                    # $f5 <-- $t4
+                cvt.s.w $f5, $f5                    # $f5 = static_cast<float>(b->weight)
+
+            div.s   $f5, $f5, $f4               # <$f5!> float ratio = static_cast<float>(b->weight) / travel_time;
+
+            PBB_For_If:
+                c.le.s  $f5, $f2                # FPCond = ratio <= biggest_ratio
+                bc1t    PBB_For_Elif            # if ratio <= biggest_ratio, goto PBB_For_Elif
+
+                mov.s   $f2, $f5                # biggest_ratio = ratio;
                 move    $v0, $t3                # best_bunny = b;
                 mov.s   $f0, $f3                # best_bunny_dist = cycles_from_bot_to_bunny;
+
+                j       PBB_For_Inc
+            PBB_For_Elif:
+                c.eq.s  $f5, $f2                # FPCond = ratio == biggest_ratio
+                bc1f    PBB_For_Inc             # if ratio != biggest_ratio, goto PBB_For_Inc
+                lw      $t5, 8($v0)             # $t5 = best_bunny->weight
+                ble     $t4, $t5, PBB_For_Inc   # if b->weight <= best_bunny->weight, goto PBB_For_Inc
+
+                mov.s   $f2, $f5                # biggest_ratio = ratio;
+                move    $v0, $t3                # best_bunny = b;
+                mov.s   $f0, $f3                # best_bunny_dist = cycles_from_bot_to_bunny;
+
 
             PBB_For_Inc:
                 add     $t2, $t2, 1             # ++i;
@@ -918,14 +988,14 @@
         and     $a0, $k0, BONK_INT_MASK     # is there a bonk interrupt?
         bne     $a0, 0, bonk_interrupt
 
+        and     $a0, $k0, PLAYPEN_UNLOCK_INT_MASK
+        bne     $a0, 0, playpen_unlock_interrupt
+
         and     $a0, $k0, TIMER_INT_MASK    # is there a timer interrupt?
         bne     $a0, 0, timer_interrupt
 
-        and     $a0 $k0 REQUEST_PUZZLE_INT_MASK
-        bne     $a0 0 request_puzzle_interrupt
-
-        and     $a0 $k0 PLAYPEN_UNLOCK_INT_MASK
-        bne     $a0 0 playpen_unlock_interrupt
+        and     $a0, $k0, REQUEST_PUZZLE_INT_MASK
+        bne     $a0, 0, request_puzzle_interrupt
 
         li      $v0, PRINT_STRING           # Unhandled interrupt types
         la      $a0, unhandled_str
@@ -970,6 +1040,10 @@
     playpen_unlock_interrupt:
         sw      $0, PLAYPEN_UNLOCK_ACK      # Acknowledge the puzzle request interrupt   
         
+        la      $t0, playpen_unlocked
+        li      $t1, 1
+        sb      $t1, 0($t0)
+
         j       interrupt_dispatch          # see if other interrupts are waiting
 
     non_intrpt:                             # was some non-interrupt
@@ -1037,6 +1111,8 @@
     puzzle_received: .byte 0                                        # Puzzle Received Interrupt
 
     has_timer: .byte 0                                              # Whether or not we should actually respect the timer interrupt
+    
+    playpen_unlocked: .byte 0
 
     fsm_state: .byte 0                                              # Current state of the FSM
 

@@ -49,4 +49,4 @@ After watching some real matches, we realized that it is definitely better to pi
 ![Nondeterministic Finite Automaton describing our Game Strategy with multibunny pickup](strat_nfa_2.png)
 
 ## Playpen Unlock Interrupt
-Our strategy is so aggressive that we are better off not acting on the playpen unlock interrupt. In addition, if our opponent stops what they are doing to lock their pen, we will already be on our way to our next bunny. However, the interrupt is being acknowldge when it happens for the sake of getting thqualification points.
+We can track whether that interrupt fired in memory, finish the state we are on, and then shortcircuit to moving to the playpen and locking it. Then moving on as normal from there.

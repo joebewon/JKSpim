@@ -112,3 +112,7 @@ PickBestResult PickBestBunny() {
 ```
 
 Point of note, `pythag_bunny_to_playpen` and `pythag_bunny_to_playpen` are being treated as a black-boxes, however, they would be written inline with the rest of the function.
+
+## Picking Multiple Bunnies
+
+The algorithm is good, but it is not optimal when picking up multiple bunnies. We don't need the bunny to playpen distance until we are picking the last bunny in the set. We can track whether that interrupt fired in memory, finish the state we are on, and then shortcircuit to moving to the playpen and locking it.
