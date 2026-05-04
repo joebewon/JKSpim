@@ -28,9 +28,6 @@ because saving and jumping back to the right part of an unfinished puzzle solve
 is handled automatically by the kernel. In addition, it means that we never have to
 wait for a puzzle to be done to do an action in the strategy.
 
-After watching a few matches, though, we saw that it is way better to pickup multiple bunnies in a row. After editing the FSM
-to reflect this change, we saw our score skyrocket when playing against ourselves, now allowing us to qualify against ourselves.
-
 To actually be able to have this seperation of roles, the most important part of the project
 becomes optizmizing movement. For starters, we need the movement on a timer interrupt,
 that we we can continue to solve puzzles while we move, while also keeping the amount of time
@@ -53,12 +50,17 @@ into halfwords as values from -180 degrees to 180 degrees only need 16 bits to b
 minimizes the memory and file size usage of the lookup table while also allowing us to compute
 arctan2(deltaY, deltaX) in one step. The table can be viewed here: https://github.com/joebewon/JKSpim/blob/main/src/Atan2lookup.s.
 
-Our magnum opus of the project, however, is our bunny picking algorithm, which is
+Our magnum opus of the project was (this changed later) our bunny picking algorithm, which is
 specified in full here: https://github.com/joebewon/JKSpim/blob/main/Theory/2GreedyBunnyPicking.md.
 The big idea about this algorithm, is that it weighs each bunny by a ration of its weight in zetners, to the total distance
 from the spimbot to the bunny and the bunny to our playpen. Then by ignoring all bunnies that will jump before
 we would reach them, we can choose the bunny with the biggest weight to total distance ratio, therebye always
 maximizing our change in zetners with respect to time.
+
+After watching a few matches, though, we saw that it is way better to pickup multiple bunnies in a row. After editing the FSM
+to reflect this change, we saw our score skyrocket when playing against ourselves, now allowing us to qualify against ourselves.
+In addition, we saw that a better bunny picking choice is the closest bunny as the other players that were choosing the closest bunny,
+were still beating us even after we allowed more bunnies to be picked up.
 
 Although our main focus was on all of the above, we were also trying to optimize puzzle solving. When doing research, we came up with few ideas:
 Modular Gaussian Eliminiation, turning the given solver iterative, and Chase the Lights. At first, we were trying to turn the given solver iterative
