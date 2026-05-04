@@ -28,6 +28,9 @@ because saving and jumping back to the right part of an unfinished puzzle solve
 is handled automatically by the kernel. In addition, it means that we never have to
 wait for a puzzle to be done to do an action in the strategy.
 
+After watching a few matches, though, we saw that it is way better to pickup multiple bunnies in a row. After editing the FSM
+to reflect this change, we saw our score skyrocket when playing against ourselves, now allowing us to qualify against ourselves.
+
 To actually be able to have this seperation of roles, the most important part of the project
 becomes optizmizing movement. For starters, we need the movement on a timer interrupt,
 that we we can continue to solve puzzles while we move, while also keeping the amount of time
