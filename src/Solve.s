@@ -425,6 +425,33 @@ CTLSolve2:
         add     $sp, $sp, 40
         jr      $ra
 
+# $a0 - max dim
+# $a1 - min dim
+# $a2 - encoded residual
+# $v0 - first row enumerate
+CLTLUT2:
+
+    CLTLUT2_1_1:
+        la      $v0, CTL_LUT_2_1_1                          # 2 instructions
+        add     $v0, $v0, $a2                               # 1 instruction
+        lhu     $v0, 0($v0)                                 # 1 instruction
+        jr      $ra                                         # 1 instruction
+    CLTLUT2_2_1:
+    CLTLUT2_3_1:
+    CLTLUT2_4_1:
+    CLTLUT2_5_1:
+    CLTLUT2_6_1:
+    CLTLUT2_7_1:
+    CLTLUT2_8_1:
+    CLTLUT2_9_1:
+    CLTLUT2_10_1:
+    CLTLUT2_11_1:
+    CLTLUT2_12_1:
+    CLTLUT2_13_1:
+    CLTLUT2_14_1:
+    CLTLUT2_15_1:
+    CLTLUT2_16_1:
+
 # @function
 #
 # Solves a puzzle using a Chase The Lights Lookup Table for num_colors = 3
